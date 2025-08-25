@@ -1,0 +1,2167 @@
+<!--
+    Advanced GeoJSON Converter & Error Recovery Tool
+    Copyright (C) 2025 GeoRoots
+    
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+    
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+    
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fixer - GeoRoots</title>
+    
+    <style>
+        /* CSS Variables for consistent color scheme */
+        :root {
+            --primary-color: #1b4332;
+            --secondary-color: #40916c;
+            --accent-color: #efffef;
+            --dark-color: #1b4332;
+            --light-color: #f8f9fa;
+            --danger-color: #dc6575;
+            --confirm-color: #40916c;
+            --text-color: #333;
+            --border-color: #e9ecef;
+            --shadow-color: rgba(0, 0, 0, 0.1);
+            
+            /* Gray Scale */
+            --gray-light: #f1f4f2;
+            --gray-medium: #6c757d;
+            --gray-dark: #495057;
+            --gray-border: #e9ecef;
+            --gray-input: #ddd;
+            
+            /* Basic Colors */
+            --white: #ffffff;
+            --black: #000000;
+            
+            /* Status Colors */
+            --error-bg: #f8d7da;
+            --error-border: #f5c6cb;
+            --error-text: #721c24;
+            --success-bg: #d4edda;
+            --success-border: #c3e6cb;
+            --success-text: #155724;
+            --warning-bg: #fff3cd;
+            --warning-border: #ffeaa7;
+            --warning-text: #856404;
+            
+            /* Overlay and UI Colors */
+            --modal-overlay: rgba(0, 0, 0, 0.7);
+            --loading-overlay: rgba(0, 0, 0, 0.6);
+            --spinner-bg: #f3f3f3;
+            
+            /* Hover States */
+            --danger-hover: #d14a5a;
+            --success-hover: #4a9f6b;
+            --secondary-hover: #2d5a3d;
+            
+            /* Special Elements */
+            --drop-border: #ccc;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text-color);
+            background: var(--light-color);
+            min-height: 100vh;
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: var(--white);
+            border-radius: 16px;
+            box-shadow: 0 20px 60px var(--shadow-color);
+            overflow: hidden;
+        }
+
+        .main-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: var(--secondary-color);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            position: relative;
+        }
+
+        .language-selector {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .language-selector select {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+        }
+
+        .language-selector select option {
+            background: var(--white);
+            color: var(--text-color);
+        }
+
+        .language-selector label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .header .small-print {
+            font-size: 0.8rem;
+            opacity: 0.7;
+            margin-top: 8px;
+            line-height: 1.3;
+        }
+
+        .header .small-print a {
+            color: var(--white);
+            transition: color 0.3s ease;
+        }
+
+        .content-area {
+            flex: 1;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .panel {
+            background: var(--white);
+            border-radius: 16px;
+            box-shadow: 0 20px 60px var(--shadow-color);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-header {
+            background: var(--gray-light);
+            border-bottom: 1px solid var(--gray-border);
+            padding: 15px 20px;
+            font-weight: 600;
+            color: var(--gray-dark);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .panel-content {
+            flex: 1;
+            padding: 20px;
+            overflow: auto;
+        }
+
+        .file-drop-area {
+            width: 100%;
+            height: 200px;
+            border: 3px dashed var(--drop-border);
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            padding: 20px;
+            transition: all 0.3s ease;
+            background-color: var(--gray-light);
+            cursor: pointer;
+        }
+
+        .file-drop-area.is-active {
+            border-color: var(--confirm-color);
+            background-color: rgba(88, 183, 117, 0.1);
+        }
+
+        .file-drop-area.has-error {
+            border-color: var(--danger-color);
+            background-color: rgba(220, 101, 117, 0.1);
+        }
+
+        .upload-icon {
+            font-size: 2rem;
+            color: var(--gray-medium);
+            margin-bottom: 1rem;
+        }
+
+        /* Enhanced JSON Editor with Line Numbers */
+        .json-editor-container {
+            position: relative;
+            border: 1px solid var(--gray-input);
+            border-radius: 6px;
+            overflow: hidden;
+            height: 400px;
+            display: flex;
+            background: var(--white);
+        }
+
+        .json-editor-container.has-error {
+            border-color: var(--danger-color);
+        }
+
+        .line-numbers {
+            background: var(--gray-light);
+            border-right: 1px solid var(--gray-border);
+            padding: 10px 8px 10px 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            color: var(--gray-medium);
+            text-align: right;
+            user-select: none;
+            min-width: 50px;
+            overflow: hidden;
+            white-space: pre;
+            position: relative;
+        }
+
+        .json-editor {
+            flex: 1;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            border: none;
+            padding: 10px;
+            resize: none;
+            outline: none;
+            line-height: 1.4;
+            background: var(--white);
+            overflow-y: auto;
+            overflow-x: auto;
+            white-space: pre;
+            word-wrap: break-word;
+            tab-size: 2;
+        }
+
+        .json-editor.has-error {
+            background-color: rgba(220, 101, 117, 0.05);
+        }
+
+        /* Synchronized scrolling */
+        .json-editor::-webkit-scrollbar {
+            width: 12px;
+            height: 12px;
+        }
+
+        .json-editor::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        .json-editor::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 6px;
+        }
+
+        .json-editor::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+
+        .error-message {
+            background: var(--error-bg);
+            color: var(--error-text);
+            border: 1px solid var(--error-border);
+            border-radius: 6px;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+
+        .success-message {
+            background: var(--success-bg);
+            color: var(--success-text);
+            border: 1px solid var(--success-border);
+            border-radius: 6px;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+
+        .warning-message {
+            background: var(--warning-bg);
+            color: var(--warning-text);
+            border: 1px solid var(--warning-border);
+            border-radius: 6px;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+
+        .btn {
+            background: var(--confirm-color);
+            color: var(--white);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn-success {
+            background: var(--confirm-color);
+        }
+
+        .btn-success:hover {
+            background: var(--success-hover);
+            box-shadow: 0 4px 12px rgba(74, 159, 107, 0.3);
+        }
+
+        .btn-danger {
+            background: var(--danger-color);
+        }
+
+        .btn-danger:hover {
+            background: var(--danger-hover);
+            box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
+        }
+
+        .btn-secondary {
+            background: var(--gray-medium);
+        }
+
+        .btn-secondary:hover {
+            background: var(--gray-dark);
+            box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
+        }
+
+        .static-fields {
+            margin-bottom: 20px;
+        }
+
+        .static-field-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+
+        .static-field-row select,
+        .static-field-row input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid var(--gray-input);
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .static-field-row button {
+            padding: 8px 12px;
+            background: var(--danger-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .property-mapping {
+            margin-bottom: 20px;
+        }
+
+        .property-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: center;
+            padding: 10px;
+            background: var(--gray-light);
+            border-radius: 6px;
+        }
+
+        .property-row input,
+        .property-row select {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid var(--gray-input);
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: var(--gray-light);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid var(--gray-border);
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--confirm-color);
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: var(--gray-medium);
+            margin-top: 5px;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--loading-overlay);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+            flex-direction: column;
+            color: white;
+        }
+
+        .loading-overlay.show {
+            display: flex;
+        }
+
+        .loading-spinner {
+            border: 8px solid var(--spinner-bg);
+            border-top: 8px solid var(--confirm-color);
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .processing-options {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+
+        .processing-options label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .processing-options input[type="checkbox"] {
+            margin: 0;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: var(--gray-border);
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--confirm-color);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        /* Large screens */
+        @media (min-width: 1200px) {
+            .content-area {
+                grid-template-columns: 1fr 1fr;
+                gap: 30px;
+            }
+        }
+
+        /* Medium screens */
+        @media (max-width: 1024px) {
+            body {
+                padding: 10px;
+            }
+            
+            .content-area {
+                grid-template-columns: 1fr;
+                gap: 10px;
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .header {
+                padding: 15px;
+            }
+        }
+
+        /* Small screens */
+        @media (max-width: 768px) {
+            body {
+                padding: 5px;
+            }
+            
+            .header {
+                padding: 20px 15px 15px 15px;
+            }
+            
+            .header h1 {
+                font-size: 1.8rem;
+            }
+            
+            .header p {
+                font-size: 1rem;
+            }
+            
+            .language-selector {
+                position: static;
+                justify-content: center;
+                margin-bottom: 15px;
+            }
+            
+            /* Touch-friendly targets */
+            .btn {
+                min-height: 44px;
+                padding: 12px 24px;
+            }
+            
+            .file-drop-area {
+                min-height: 120px;
+            }
+        }
+
+        /* Very small screens */
+        @media (max-width: 480px) {
+            .header h1 {
+                font-size: 1.5rem;
+            }
+            
+            .header p {
+                font-size: 0.9rem;
+            }
+            
+            .file-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+            
+            .file-info {
+                width: 100%;
+                overflow: hidden;
+            }
+            
+            .file-name {
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            
+            .remove-file {
+                align-self: flex-end;
+                min-height: 44px;
+                min-width: 44px;
+            }
+            
+            /* Stack buttons vertically */
+            .button-group {
+                flex-direction: column;
+            }
+            
+            .button-group .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+
+        .syntax-highlight {
+            background: var(--gray-light);
+            border: 1px solid var(--gray-border);
+            border-radius: 6px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .json-string { color: #008000; }
+        .json-number { color: #0000ff; }
+        .json-boolean { color: #ff6600; }
+        .json-null { color: #ff6600; }
+        .json-key { color: #8b0000; font-weight: bold; }
+        .json-error { background-color: #ffcccc; color: #cc0000; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="main-container">
+            <div class="header">
+            <div class="language-selector">
+                <label for="languageSelect" aria-label="Select language">🌐</label>
+                <select id="languageSelect" aria-label="Language selection">
+                    <option value="en">English</option>
+                    <option value="es">Español</option>
+                    <option value="pt">Português</option>
+                </select>
+            </div>
+            <h1 data-i18n="title">GeoRoots Fixer</h1>
+            <p data-i18n="subtitle">Advanced GeoJSON Converter & Error Recovery Tool</p>
+            <p data-i18n="privacy" class="small-print">Your file and any of its content is only processed locally in your browser and none of your information is sent to anyone else.</p>
+            <p data-i18n="license" class="small-print">This software is free, released under GPLv3 open source license.</p>
+                            <p class="small-print"><span data-i18n="downloadLatest">Download latest version and other tools on</span> <a href="https://georoots.eu/" target="_blank">https://georoots.eu/</a></p>
+        </div>
+
+        <div class="content-area">
+            <!-- Input Panel -->
+            <div class="panel">
+                <div class="panel-header">
+                    📤
+                    <span data-i18n="inputEditor">Input & Editor</span>
+                </div>
+                <div class="panel-content">
+                    <div class="file-drop-area" id="dropArea">
+                        <div class="upload-icon">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
+                                <path d="M12,12L16,16H13.5V19H10.5V16H8L12,12Z"/>
+                            </svg>
+                        </div>
+                        <p data-i18n="dropFile">Drop your GeoJSON/JSON file here</p>
+                        <p data-i18n="orClickBrowse">or click to browse</p>
+                        <input type="file" id="fileInput" accept=".json,.geojson" style="display: none;" aria-label="Upload GeoJSON file">
+                    </div>
+
+                    <div id="errorMessages"></div>
+
+                    <div id="editorSection">
+                        <div>
+                            <label>
+                                📝 <span data-i18n="jsonEditor">JSON Editor</span>
+                            </label>
+                            <div class="json-editor-container" id="jsonEditorContainer">
+                                <div class="line-numbers" id="lineNumbers">1</div>
+                                <textarea id="jsonEditor" class="json-editor" data-i18n-placeholder="jsonEditorPlaceholder" autocomplete="off"></textarea>
+                            </div>
+                        </div>
+                        
+                        <div class="button-group">
+                            <button id="validateBtn" class="btn">
+                                ✔️ <span data-i18n="validateJSON">Validate JSON</span>
+                            </button>
+                            <button id="fixBtn" class="btn btn-secondary">
+                                🔧 <span data-i18n="autoFixIssues">Auto-Fix Common Issues</span>
+                            </button>
+                            <button id="formatBtn" class="btn btn-secondary">
+                                📄 <span data-i18n="formatJSON">Format JSON</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Processing Panel -->
+            <div class="panel">
+                <div class="panel-header">
+                    ⚙️
+                    <span data-i18n="processingConfig">Processing & Configuration</span>
+                </div>
+                <div class="panel-content">
+                    <div id="fileStats">
+                        <div class="stats">
+                            <div class="stat-card">
+                                <span id="featureCount" class="stat-number">0</span>
+                                <div class="stat-label" data-i18n="features">Features</div>
+                            </div>
+                            <div class="stat-card">
+                                <span id="polygonCount" class="stat-number">0</span>
+                                <div class="stat-label" data-i18n="polygons">Polygons</div>
+                            </div>
+                            <div class="stat-card">
+                                <span id="multiPolygonCount" class="stat-number">0</span>
+                                <div class="stat-label" data-i18n="multiPolygons">MultiPolygons</div>
+                            </div>
+                            <div class="stat-card">
+                                <span id="pointCount" class="stat-number">0</span>
+                                <div class="stat-label" data-i18n="points">Points</div>
+                            </div>
+                            <div class="stat-card">
+                                <span id="errorCount" class="stat-number">0</span>
+                                <div class="stat-label" data-i18n="errors">Errors</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="staticFields" class="static-fields">
+                        <h4>
+                            💾 <span data-i18n="staticFieldValues">Static Field Values</span>
+                        </h4>
+                        <div id="staticFieldsList"></div>
+                        <button id="addStaticField" class="btn btn-secondary">
+                            ➕ <span data-i18n="addStaticField">Add Static Field</span>
+                        </button>
+                    </div>
+
+                    <div id="propertyMapping" class="property-mapping">
+                        <h4>
+                            🔁 <span data-i18n="propertyMapping">Property Mapping</span>
+                        </h4>
+                        <div id="propertyList"></div>
+                    </div>
+
+                    <div id="processingOptions">
+                        <h4>
+                            ⚙️ <span data-i18n="processingOptions">Processing Options</span>
+                        </h4>
+                        <div class="processing-options">
+                            <label>
+                                <input type="checkbox" id="splitMultiPolygons" checked>
+                                <span data-i18n="splitMultiPolygons">Split MultiPolygons into separate Polygon features</span>
+                            </label>
+                            <label>
+                                <input type="checkbox" id="validateGeometry" checked>
+                                <span data-i18n="validateGeometry">Validate and fix geometry issues</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="actionButtons" class="button-group">
+                        <button id="processBtn" class="btn btn-success">
+                            ▶️ <span data-i18n="processGeoJSON">Process GeoJSON</span>
+                        </button>
+                        <button id="resetBtn" class="btn btn-danger">
+                            🔄 <span data-i18n="reset">Reset</span>
+                        </button>
+                    </div>
+
+                    <div class="progress-bar" id="progressBar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                </div>
+            </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <p data-i18n="processingMessage">Processing your GeoJSON...</p>
+    </div>
+
+    <script>
+        // Translation system
+        const translations = {
+            en: {
+                title: "GeoRoots Fixer",
+                subtitle: "Advanced GeoJSON Converter & Error Recovery Tool",
+                privacy: "Your file and any of its content is only processed locally in your browser and none of your information is sent to anyone else.",
+                license: "This software is free, released under GPLv3 open source license.",
+                inputEditor: "Input & Editor",
+                processingConfig: "Processing & Configuration",
+                dropFile: "Drop your GeoJSON/JSON file here",
+                orClickBrowse: "or click to browse",
+                jsonEditor: "JSON Editor",
+                validateJSON: "Validate JSON",
+                autoFixIssues: "Auto-Fix Common Issues",
+                formatJSON: "Format JSON",
+                features: "Features",
+                polygons: "Polygons",
+                multiPolygons: "MultiPolygons",
+                points: "Points",
+                errors: "Errors",
+                staticFieldValues: "Static Field Values",
+                addStaticField: "Add Static Field",
+                propertyMapping: "Property Mapping",
+                processingOptions: "Processing Options",
+                splitMultiPolygons: "Split MultiPolygons into separate Polygon features",
+                validateGeometry: "Validate and fix geometry issues",
+                processGeoJSON: "Process & Download GeoJSON",
+                downloadResult: "Download Result",
+                reset: "Reset",
+                processingMessage: "Processing your GeoJSON...",
+                selectField: "Select field",
+                customField: "Custom field...",
+                staticValue: "Static value",
+                discardPropertyInformation: "Discard Property Information",
+                customFieldName: "Custom field name...",
+                pleaseProvideJSON: "Please provide JSON content",
+                jsonValid: "JSON is valid!",
+                jsonFormattedSuccess: "JSON formatted successfully!",
+                failedToReadFile: "Failed to read file: ",
+                cannotFormatInvalidJSON: "Cannot format invalid JSON. Please fix errors first.",
+                noValidDataToProcess: "No valid data to process",
+                processingFailed: "Processing failed: ",
+                noProcessedDataToDownload: "No processed data to download",
+                successfullyProcessed: "Successfully processed ",
+                featuresCount: " features!",
+                jsonEditorPlaceholder: "Paste your JSON/GeoJSON here...",
+                autoFixSuccess: "Auto-fix completed successfully!",
+                autoFixFailed: "Auto-fix failed. Original text preserved. Please fix manually.",
+                fileTooLarge: "File is too large. Maximum size is 10MB.",
+                invalidGeoJSON: "Invalid GeoJSON structure",
+                invalidGeoJSONStructure: "Invalid GeoJSON structure",
+                missingTypeField: "Missing 'type' field",
+                invalidTypeField: "Invalid 'type' field",
+                invalidFeaturesArray: "Invalid 'features' array",
+                invalidFeature: "Invalid feature",
+                invalidFeatureType: "Invalid feature type",
+                missingGeometry: "Missing geometry",
+                invalidGeometry: "Invalid geometry",
+                missingGeometryType: "Missing geometry type",
+                missingCoordinates: "Missing coordinates",
+                invalidGeometryType: "Invalid geometry type",
+                coordinatesMustBeArray: "Coordinates must be an array",
+                invalidPointCoordinates: "Invalid point coordinates",
+                invalidCoordinateValues: "Invalid coordinate values",
+                invalidLineStringCoordinates: "Invalid LineString coordinates",
+                invalidCoordinateArray: "Invalid coordinate array",
+                invalidPolygonCoordinates: "Invalid polygon coordinates",
+                invalidPolygonRing: "Invalid polygon ring",
+                invalidMultiGeometryCoordinates: "Invalid multi-geometry coordinates",
+                downloadLatest: "Download latest version and other tools on"
+            },
+            es: {
+                title: "GeoRoots Fixer",
+                subtitle: "Herramienta Avanzada de Conversión y Recuperación de Errores GeoJSON",
+                privacy: "Tu archivo y todo su contenido se procesa únicamente localmente en tu navegador y ninguna de tu información se envía a nadie más.",
+                license: "Este software es gratuito, liberado bajo licencia de código abierto GPLv3.",
+                inputEditor: "Entrada y Editor",
+                processingConfig: "Procesamiento y Configuración",
+                dropFile: "Suelta tu archivo GeoJSON/JSON aquí",
+                orClickBrowse: "o haz clic para explorar",
+                jsonEditor: "Editor JSON",
+                validateJSON: "Validar JSON",
+                autoFixIssues: "Auto-corregir Problemas Comunes",
+                formatJSON: "Formatear JSON",
+                features: "Características",
+                polygons: "Polígonos",
+                multiPolygons: "MultiPolígonos",
+                points: "Puntos",
+                errors: "Errores",
+                staticFieldValues: "Valores de Campo Estático",
+                addStaticField: "Agregar Campo Estático",
+                propertyMapping: "Mapeo de Propiedades",
+                processingOptions: "Opciones de Procesamiento",
+                splitMultiPolygons: "Dividir MultiPolígonos en características de Polígono separadas",
+                validateGeometry: "Validar y corregir problemas de geometría",
+                processGeoJSON: "Procesar y Descargar GeoJSON",
+                downloadResult: "Descargar Resultado",
+                reset: "Reiniciar",
+                processingMessage: "Procesando tu GeoJSON...",
+                selectField: "Seleccionar campo",
+                customField: "Campo personalizado...",
+                staticValue: "Valor estático",
+                discardPropertyInformation: "Descartar Información de Propiedad",
+                customFieldName: "Nombre de campo personalizado...",
+                pleaseProvideJSON: "Por favor proporciona contenido JSON",
+                jsonValid: "¡JSON es válido!",
+                jsonFormattedSuccess: "¡JSON formateado exitosamente!",
+                failedToReadFile: "Error al leer archivo: ",
+                cannotFormatInvalidJSON: "No se puede formatear JSON inválido. Por favor corrige los errores primero.",
+                noValidDataToProcess: "No hay datos válidos para procesar",
+                processingFailed: "El procesamiento falló: ",
+                noProcessedDataToDownload: "No hay datos procesados para descargar",
+                successfullyProcessed: "Procesado exitosamente ",
+                featuresCount: " características!",
+                jsonEditorPlaceholder: "Pega tu JSON/GeoJSON aquí...",
+                autoFixSuccess: "¡Auto-corrección completada exitosamente!",
+                autoFixFailed: "Auto-corrección falló. Texto original preservado. Por favor corrige manualmente.",
+                fileTooLarge: "El archivo es demasiado grande. Tamaño máximo es 10MB.",
+                invalidGeoJSON: "Estructura GeoJSON inválida",
+                invalidGeoJSONStructure: "Estructura GeoJSON inválida",
+                missingTypeField: "Campo 'type' faltante",
+                invalidTypeField: "Campo 'type' inválido",
+                invalidFeaturesArray: "Array 'features' inválido",
+                invalidFeature: "Característica inválida",
+                invalidFeatureType: "Tipo de característica inválido",
+                missingGeometry: "Geometría faltante",
+                invalidGeometry: "Geometría inválida",
+                missingGeometryType: "Tipo de geometría faltante",
+                missingCoordinates: "Coordenadas faltantes",
+                invalidGeometryType: "Tipo de geometría inválido",
+                coordinatesMustBeArray: "Las coordenadas deben ser un array",
+                invalidPointCoordinates: "Coordenadas de punto inválidas",
+                invalidCoordinateValues: "Valores de coordenadas inválidos",
+                invalidLineStringCoordinates: "Coordenadas de LineString inválidas",
+                invalidCoordinateArray: "Array de coordenadas inválido",
+                invalidPolygonCoordinates: "Coordenadas de polígono inválidas",
+                invalidPolygonRing: "Anillo de polígono inválido",
+                invalidMultiGeometryCoordinates: "Coordenadas de multi-geometría inválidas",
+                downloadLatest: "Descarga la última versión y otras herramientas en"
+            },
+            pt: {
+                title: "GeoRoots Fixer",
+                subtitle: "Ferramenta Avançada de Conversão e Recuperação de Erros GeoJSON",
+                privacy: "Seu arquivo e todo seu conteúdo é processado apenas localmente no seu navegador e nenhuma de suas informações é enviada para ninguém mais.",
+                license: "Este software é gratuito, liberado sob licença de código aberto GPLv3.",
+                inputEditor: "Entrada e Editor",
+                processingConfig: "Processamento e Configuração",
+                dropFile: "Solte seu arquivo GeoJSON/JSON aqui",
+                orClickBrowse: "ou clique para navegar",
+                jsonEditor: "Editor JSON",
+                validateJSON: "Validar JSON",
+                autoFixIssues: "Auto-corrigir Problemas Comuns",
+                formatJSON: "Formatar JSON",
+                features: "Características",
+                polygons: "Polígonos",
+                multiPolygons: "MultiPolígonos",
+                points: "Pontos",
+                errors: "Erros",
+                staticFieldValues: "Valores de Campo Estático",
+                addStaticField: "Adicionar Campo Estático",
+                propertyMapping: "Mapeamento de Propriedades",
+                processingOptions: "Opções de Processamento",
+                splitMultiPolygons: "Dividir MultiPolígonos em características de Polígono separadas",
+                validateGeometry: "Validar e corrigir problemas de geometria",
+                processGeoJSON: "Processar e Baixar GeoJSON",
+                downloadResult: "Baixar Resultado",
+                reset: "Reiniciar",
+                processingMessage: "Processando seu GeoJSON...",
+                selectField: "Selecionar campo",
+                customField: "Campo personalizado...",
+                staticValue: "Valor estático",
+                discardPropertyInformation: "Descartar Informação da Propriedade",
+                customFieldName: "Nome do campo personalizado...",
+                pleaseProvideJSON: "Por favor forneça conteúdo JSON",
+                jsonValid: "JSON é válido!",
+                jsonFormattedSuccess: "JSON formatado com sucesso!",
+                failedToReadFile: "Falha ao ler arquivo: ",
+                cannotFormatInvalidJSON: "Não é possível formatar JSON inválido. Por favor corrija os erros primeiro.",
+                noValidDataToProcess: "Não há dados válidos para processar",
+                processingFailed: "O processamento falhou: ",
+                noProcessedDataToDownload: "Não há dados processados para baixar",
+                successfullyProcessed: "Processado com sucesso ",
+                featuresCount: " características!",
+                jsonEditorPlaceholder: "Cole seu JSON/GeoJSON aqui...",
+                autoFixSuccess: "Auto-correção concluída com sucesso!",
+                autoFixFailed: "Auto-correção falhou. Texto original preservado. Por favor corrija manualmente.",
+                fileTooLarge: "O arquivo é muito grande. Tamanho máximo é 10MB.",
+                invalidGeoJSON: "Estrutura GeoJSON inválida",
+                invalidGeoJSONStructure: "Estrutura GeoJSON inválida",
+                missingTypeField: "Campo 'type' ausente",
+                invalidTypeField: "Campo 'type' inválido",
+                invalidFeaturesArray: "Array 'features' inválido",
+                invalidFeature: "Característica inválida",
+                invalidFeatureType: "Tipo de característica inválido",
+                missingGeometry: "Geometria ausente",
+                invalidGeometry: "Geometria inválida",
+                missingGeometryType: "Tipo de geometria ausente",
+                missingCoordinates: "Coordenadas ausentes",
+                invalidGeometryType: "Tipo de geometria inválido",
+                coordinatesMustBeArray: "As coordenadas devem ser um array",
+                invalidPointCoordinates: "Coordenadas de ponto inválidas",
+                invalidCoordinateValues: "Valores de coordenadas inválidos",
+                invalidLineStringCoordinates: "Coordenadas de LineString inválidas",
+                invalidCoordinateArray: "Array de coordenadas inválido",
+                invalidPolygonCoordinates: "Coordenadas de polígono inválidas",
+                invalidPolygonRing: "Anel de polígono inválido",
+                invalidMultiGeometryCoordinates: "Coordenadas de multi-geometria inválidas",
+                downloadLatest: "Baixe a versão mais recente e outras ferramentas em"
+            }
+        };
+
+        class GeoJSONConverter {
+            constructor() {
+                this.rawData = null;
+                this.processedData = null;
+                this.errors = [];
+                this.warnings = [];
+                this.staticFields = new Map();
+                this.propertyMappings = new Map();
+                this.discardedProperties = new Set();
+                this.currentLanguage = 'en';
+                this.eventListeners = new Map(); // Track event listeners for cleanup
+                this.validateTimeout = null; // Initialize validation timeout
+                this.initializeEventListeners();
+                this.updateLineNumbers();
+                this.initializeLanguage();
+            }
+
+            initializeEventListeners() {
+                const dropArea = document.getElementById('dropArea');
+                const fileInput = document.getElementById('fileInput');
+                const jsonEditor = document.getElementById('jsonEditor');
+
+                // File upload handlers
+                this.addEventListener(dropArea, 'click', () => fileInput.click());
+                this.addEventListener(dropArea, 'dragover', this.handleDragOver.bind(this));
+                this.addEventListener(dropArea, 'dragleave', this.handleDragLeave.bind(this));
+                this.addEventListener(dropArea, 'drop', this.handleDrop.bind(this));
+                this.addEventListener(fileInput, 'change', this.handleFileSelect.bind(this));
+
+                // Editor handlers
+                this.addEventListener(jsonEditor, 'input', this.handleEditorChange.bind(this));
+                this.addEventListener(jsonEditor, 'scroll', this.syncLineNumbersScroll.bind(this));
+                this.addEventListener(jsonEditor, 'keydown', this.handleEditorKeydown.bind(this));
+                this.addEventListener(jsonEditor, 'paste', () => {
+                    setTimeout(() => this.updateLineNumbers(), 0);
+                });
+
+                // Button handlers
+                this.addEventListener(document.getElementById('validateBtn'), 'click', this.validateJSON.bind(this));
+                this.addEventListener(document.getElementById('fixBtn'), 'click', this.autoFixJSON.bind(this));
+                this.addEventListener(document.getElementById('formatBtn'), 'click', this.formatJSON.bind(this));
+                this.addEventListener(document.getElementById('processBtn'), 'click', this.processGeoJSON.bind(this));
+                this.addEventListener(document.getElementById('resetBtn'), 'click', this.reset.bind(this));
+                this.addEventListener(document.getElementById('addStaticField'), 'click', this.addStaticField.bind(this));
+
+                // Language selector
+                this.addEventListener(document.getElementById('languageSelect'), 'change', this.changeLanguage.bind(this));
+            }
+
+            addEventListener(element, event, handler) {
+                element.addEventListener(event, handler);
+                const key = `${element.id || 'unknown'}_${event}`;
+                if (!this.eventListeners.has(key)) {
+                    this.eventListeners.set(key, []);
+                }
+                this.eventListeners.get(key).push({ element, event, handler });
+            }
+
+            removeEventListeners() {
+                this.eventListeners.forEach((listeners, key) => {
+                    listeners.forEach(({ element, event, handler }) => {
+                        element.removeEventListener(event, handler);
+                    });
+                });
+                this.eventListeners.clear();
+            }
+
+            initializeLanguage() {
+                // Set default language or load from localStorage
+                const savedLanguage = localStorage.getItem('preferredLanguage') || 'en';
+                document.getElementById('languageSelect').value = savedLanguage;
+                this.currentLanguage = savedLanguage;
+                this.updateTranslations();
+            }
+
+            changeLanguage(event) {
+                this.currentLanguage = event.target.value;
+                localStorage.setItem('preferredLanguage', this.currentLanguage);
+                this.updateTranslations();
+            }
+
+            updateTranslations() {
+                const elements = document.querySelectorAll('[data-i18n]');
+                elements.forEach(element => {
+                    const key = element.getAttribute('data-i18n');
+                    const translation = translations[this.currentLanguage][key];
+                    if (translation) {
+                        element.textContent = translation;
+                    }
+                });
+
+                // Handle placeholder translations
+                const placeholderElements = document.querySelectorAll('[data-i18n-placeholder]');
+                placeholderElements.forEach(element => {
+                    const key = element.getAttribute('data-i18n-placeholder');
+                    const translation = translations[this.currentLanguage][key];
+                    if (translation) {
+                        element.placeholder = translation;
+                    }
+                });
+            }
+
+            updateLineNumbers() {
+                const editor = document.getElementById('jsonEditor');
+                const lineNumbers = document.getElementById('lineNumbers');
+                
+                const lines = editor.value.split('\n');
+                const lineCount = lines.length;
+                
+                let lineNumbersText = '';
+                for (let i = 1; i <= lineCount; i++) {
+                    lineNumbersText += i + '\n';
+                }
+                
+                lineNumbers.textContent = lineNumbersText;
+                
+                // Sync scroll position
+                this.syncLineNumbersScroll();
+            }
+
+            syncLineNumbersScroll() {
+                const editor = document.getElementById('jsonEditor');
+                const lineNumbers = document.getElementById('lineNumbers');
+                lineNumbers.scrollTop = editor.scrollTop;
+            }
+
+            handleEditorKeydown(e) {
+                const editor = document.getElementById('jsonEditor');
+                
+                // Handle Tab key for proper indentation
+                if (e.key === 'Tab') {
+                    e.preventDefault();
+                    const start = editor.selectionStart;
+                    const end = editor.selectionEnd;
+                    
+                    // Insert 2 spaces instead of tab
+                    editor.value = editor.value.substring(0, start) + '  ' + editor.value.substring(end);
+                    editor.selectionStart = editor.selectionEnd = start + 2;
+                    
+                    this.updateLineNumbers();
+                }
+                
+                // Update line numbers on Enter key and other keys that might change line count
+                if (e.key === 'Enter' || e.key === 'Backspace' || e.key === 'Delete') {
+                    setTimeout(() => this.updateLineNumbers(), 0);
+                }
+            }
+
+            handleDragOver(e) {
+                e.preventDefault();
+                document.getElementById('dropArea').classList.add('is-active');
+            }
+
+            handleDragLeave(e) {
+                e.preventDefault();
+                document.getElementById('dropArea').classList.remove('is-active');
+            }
+
+            handleDrop(e) {
+                e.preventDefault();
+                document.getElementById('dropArea').classList.remove('is-active');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    this.loadFile(files[0]);
+                }
+            }
+
+            handleFileSelect(e) {
+                const files = e.target.files;
+                if (files.length > 0) {
+                    this.loadFile(files[0]);
+                }
+            }
+
+            async loadFile(file) {
+                try {
+                    // File size validation (10MB limit)
+                    const maxSize = 10 * 1024 * 1024; // 10MB
+                    if (file.size > maxSize) {
+                        this.showError(this.getTranslation('fileTooLarge'));
+                        return;
+                    }
+
+                    const text = await file.text();
+                    document.getElementById('jsonEditor').value = text;
+                    this.updateLineNumbers();
+                    this.showEditor();
+                    this.validateJSON();
+                } catch (error) {
+                    this.showError(this.getTranslation('failedToReadFile') + error.message);
+                }
+            }
+
+            showEditor() {
+                document.getElementById('editorSection').classList.remove('hidden');
+                document.getElementById('staticFields').classList.remove('hidden');
+                document.getElementById('processingOptions').classList.remove('hidden');
+                document.getElementById('actionButtons').classList.remove('hidden');
+            }
+
+            validateJSON() {
+                const editor = document.getElementById('jsonEditor');
+                const container = document.getElementById('jsonEditorContainer');
+                const text = editor.value.trim();
+                
+                if (!text) {
+                    this.showError(this.getTranslation('pleaseProvideJSON'));
+                    return false;
+                }
+
+                try {
+                    // Try to parse the JSON
+                    const parsed = JSON.parse(text);
+                    
+                    // Validate GeoJSON structure
+                    const geoJSONValidation = this.validateGeoJSONStructure(parsed);
+                    if (!geoJSONValidation.isValid) {
+                        this.showError(this.getTranslation('invalidGeoJSON') + ': ' + geoJSONValidation.error);
+                        container.classList.add('has-error');
+                        editor.classList.add('has-error');
+                        return false;
+                    }
+                    
+                    this.rawData = parsed;
+                    this.clearErrors();
+                    this.showSuccess(this.getTranslation('jsonValid'));
+                    this.analyzeData();
+                    container.classList.remove('has-error');
+                    editor.classList.remove('has-error');
+                    return true;
+                } catch (error) {
+                    // Handle JSON parsing errors
+                    this.handleJSONError(error, text);
+                    container.classList.add('has-error');
+                    editor.classList.add('has-error');
+                    return false;
+                }
+            }
+
+            validateGeoJSONStructure(data) {
+                // Check if it's a valid GeoJSON structure
+                if (!data || typeof data !== 'object') {
+                    return { isValid: false, error: this.getTranslation('invalidGeoJSONStructure') };
+                }
+
+                // Check for required type field
+                if (!data.type) {
+                    return { isValid: false, error: this.getTranslation('missingTypeField') };
+                }
+
+                const validTypes = ['Feature', 'FeatureCollection', 'Point', 'LineString', 'Polygon', 'MultiPoint', 'MultiLineString', 'MultiPolygon', 'GeometryCollection'];
+                if (!validTypes.includes(data.type)) {
+                    return { isValid: false, error: this.getTranslation('invalidTypeField') };
+                }
+
+                // Validate FeatureCollection
+                if (data.type === 'FeatureCollection') {
+                    if (!Array.isArray(data.features)) {
+                        return { isValid: false, error: this.getTranslation('invalidFeaturesArray') };
+                    }
+                    
+                    // Validate each feature
+                    for (let i = 0; i < data.features.length; i++) {
+                        const feature = data.features[i];
+                        if (!feature || typeof feature !== 'object') {
+                            return { isValid: false, error: this.getTranslation('invalidFeature') + ` at index ${i}` };
+                        }
+                        if (feature.type !== 'Feature') {
+                            return { isValid: false, error: this.getTranslation('invalidFeatureType') + ` at index ${i}` };
+                        }
+                        if (!feature.geometry) {
+                            return { isValid: false, error: this.getTranslation('missingGeometry') + ` at index ${i}` };
+                        }
+                        
+                        const geometryValidation = this.validateGeometry(feature.geometry);
+                        if (!geometryValidation.isValid) {
+                            return { isValid: false, error: geometryValidation.error + ` at index ${i}` };
+                        }
+                    }
+                }
+
+                // Validate single Feature
+                if (data.type === 'Feature') {
+                    if (!data.geometry) {
+                        return { isValid: false, error: this.getTranslation('missingGeometry') };
+                    }
+                    
+                    const geometryValidation = this.validateGeometry(data.geometry);
+                    if (!geometryValidation.isValid) {
+                        return { isValid: false, error: geometryValidation.error };
+                    }
+                }
+
+                // Validate raw geometry
+                if (['Point', 'LineString', 'Polygon', 'MultiPoint', 'MultiLineString', 'MultiPolygon'].includes(data.type)) {
+                    const geometryValidation = this.validateGeometry(data);
+                    if (!geometryValidation.isValid) {
+                        return { isValid: false, error: geometryValidation.error };
+                    }
+                }
+
+                return { isValid: true };
+            }
+
+            validateGeometry(geometry) {
+                if (!geometry || typeof geometry !== 'object') {
+                    return { isValid: false, error: this.getTranslation('invalidGeometry') };
+                }
+
+                if (!geometry.type) {
+                    return { isValid: false, error: this.getTranslation('missingGeometryType') };
+                }
+
+                if (!geometry.coordinates) {
+                    return { isValid: false, error: this.getTranslation('missingCoordinates') };
+                }
+
+                const validTypes = ['Point', 'LineString', 'Polygon', 'MultiPoint', 'MultiLineString', 'MultiPolygon'];
+                if (!validTypes.includes(geometry.type)) {
+                    return { isValid: false, error: this.getTranslation('invalidGeometryType') };
+                }
+
+                // Basic coordinate validation
+                try {
+                    this.validateCoordinates(geometry.coordinates, geometry.type);
+                } catch (error) {
+                    return { isValid: false, error: error.message };
+                }
+
+                return { isValid: true };
+            }
+
+            validateCoordinates(coordinates, type) {
+                if (!Array.isArray(coordinates)) {
+                    throw new Error(this.getTranslation('coordinatesMustBeArray'));
+                }
+
+                switch (type) {
+                    case 'Point':
+                        if (!Array.isArray(coordinates) || coordinates.length < 2 || coordinates.length > 3) {
+                            throw new Error(this.getTranslation('invalidPointCoordinates'));
+                        }
+                        if (typeof coordinates[0] !== 'number' || typeof coordinates[1] !== 'number') {
+                            throw new Error(this.getTranslation('invalidCoordinateValues'));
+                        }
+                        break;
+                    case 'LineString':
+                        if (!Array.isArray(coordinates) || coordinates.length < 2) {
+                            throw new Error(this.getTranslation('invalidLineStringCoordinates'));
+                        }
+                        coordinates.forEach(coord => {
+                            if (!Array.isArray(coord) || coord.length < 2 || coord.length > 3) {
+                                throw new Error(this.getTranslation('invalidCoordinateArray'));
+                            }
+                        });
+                        break;
+                    case 'Polygon':
+                        if (!Array.isArray(coordinates) || coordinates.length === 0) {
+                            throw new Error(this.getTranslation('invalidPolygonCoordinates'));
+                        }
+                        coordinates.forEach(ring => {
+                            if (!Array.isArray(ring) || ring.length < 4) {
+                                throw new Error(this.getTranslation('invalidPolygonRing'));
+                            }
+                        });
+                        break;
+                    case 'MultiPoint':
+                    case 'MultiLineString':
+                    case 'MultiPolygon':
+                        if (!Array.isArray(coordinates) || coordinates.length === 0) {
+                            throw new Error(this.getTranslation('invalidMultiGeometryCoordinates'));
+                        }
+                        break;
+                }
+            }
+
+            handleJSONError(error, text) {
+                const errorMsg = error.message;
+                let line = 1, column = 1;
+
+                // Try to extract line and column information
+                const match = errorMsg.match(/at position (\d+)/);
+                if (match) {
+                    const position = parseInt(match[1]);
+                    const lines = text.substring(0, position).split('\n');
+                    line = lines.length;
+                    column = lines[lines.length - 1].length + 1;
+                }
+
+                const detailedError = `JSON Syntax Error at line ${line}, column ${column}: ${errorMsg}`;
+                this.showError(detailedError);
+
+                // Try to suggest fixes
+                this.suggestFixes(text, error);
+            }
+
+            suggestFixes(text, error) {
+                const suggestions = [];
+                const errorMsg = error.message.toLowerCase();
+
+                if (errorMsg.includes('unexpected token')) {
+                    suggestions.push('Check for missing commas between object properties or array elements');
+                    suggestions.push('Verify all quotes are properly closed');
+                    suggestions.push('Remove any trailing commas');
+                }
+
+                if (errorMsg.includes('unexpected end')) {
+                    suggestions.push('Check for missing closing brackets ] or braces }');
+                    suggestions.push('Verify all opening brackets/braces have matching closing ones');
+                }
+
+                if (suggestions.length > 0) {
+                    const suggestionHtml = '<div class="warning-message"><strong>Suggestions:</strong><ul>' +
+                        suggestions.map(s => `<li>${s}</li>`).join('') + '</ul></div>';
+                    document.getElementById('errorMessages').innerHTML += suggestionHtml;
+                }
+            }
+
+            autoFixJSON() {
+                const editor = document.getElementById('jsonEditor');
+                const originalText = editor.value.trim();
+                
+                if (!originalText) {
+                    this.showError(this.getTranslation('pleaseProvideJSON'));
+                    return;
+                }
+
+                // Try to fix the JSON
+                let fixedText = this.fixCommonJSONIssues(originalText);
+                
+                // Validate the fixed result
+                try {
+                    const parsed = JSON.parse(fixedText);
+                    // If parsing succeeds, format the JSON and update the editor
+                    const formattedText = JSON.stringify(parsed, null, 2);
+                    editor.value = formattedText;
+                    this.updateLineNumbers();
+                    this.validateJSON();
+                    this.showSuccess(this.getTranslation('autoFixSuccess'));
+                } catch (error) {
+                    // If parsing fails, keep original text and show error
+                    this.showError(this.getTranslation('autoFixFailed'));
+                    console.warn('Auto-fix failed. Original text preserved. Error:', error.message);
+                }
+            }
+
+            fixCommonJSONIssues(text) {
+                // Step 1: Fix missing commas (must be first, before whitespace cleanup)
+                text = this.fixMissingCommas(text);
+                
+                // Step 2: Basic cleanup (conservative)
+                text = this.cleanupWhitespace(text);
+                
+                // Step 3: Fix quotes (conservative)
+                text = this.fixQuotesAndSyntax(text);
+                
+                // Step 4: Fix unquoted keys (conservative)
+                text = this.fixUnquotedKeys(text);
+                
+                // Step 5: Fix trailing commas (conservative)
+                text = this.fixTrailingCommas(text);
+                
+                // Step 6: Elaborate bracket balancing
+                text = this.balanceBracketsElaborate(text);
+                
+                // Step 7: Final cleanup (conservative)
+                text = this.finalCleanup(text);
+                
+                return text;
+            }
+
+            cleanupWhitespace(text) {
+                // Remove excessive whitespace while preserving structure
+                text = text.replace(/\s+/g, ' '); // Multiple spaces to single
+                text = text.replace(/\s*([{}[\],:])\s*/g, '$1'); // Remove spaces around brackets/commas
+                text = text.replace(/\s*:\s*/g, ':'); // Remove spaces around colons
+                text = text.replace(/:\s*"/g, ':"'); // Fix spacing before quoted values
+                text = text.replace(/"\s*,/g, '",'); // Fix spacing after quoted values
+                text = text.replace(/"\s*}/g, '"}'); // Fix spacing before closing braces
+                text = text.replace(/"\s*]/g, '"]'); // Fix spacing before closing brackets
+                return text;
+            }
+
+            fixQuotesAndSyntax(text) {
+                // Fix single quotes to double quotes (conservative approach)
+                text = text.replace(/(?<!\\)'/g, '"'); // Replace single quotes, but not escaped ones
+                
+                // Fix smart quotes to regular quotes
+                text = text.replace(/[""]/g, '"');
+                text = text.replace(/['']/g, '"');
+                
+                return text;
+            }
+
+            fixUnquotedKeys(text) {
+                // Fix unquoted property names (more comprehensive pattern)
+                text = text.replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:/g, '$1"$2":');
+                
+                // Fix unquoted keys with dots (like "type": "Feature")
+                text = text.replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*\.[a-zA-Z_$][a-zA-Z0-9_$]*)\s*:/g, '$1"$2":');
+                
+                // Fix unquoted keys with spaces (should be quoted)
+                text = text.replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$\s]+)\s*:/g, '$1"$2":');
+                
+                return text;
+            }
+
+            fixTrailingCommas(text) {
+                // Remove trailing commas before closing brackets/braces
+                text = text.replace(/,(\s*[}\]])/g, '$1');
+                
+                // Remove trailing commas before closing braces
+                text = text.replace(/,(\s*})/g, '$1');
+                
+                // Remove trailing commas in arrays
+                text = text.replace(/,(\s*])/g, '$1');
+                
+                return text;
+            }
+
+            fixMissingCommas(text) {
+                // Simple and elegant approach: find patterns where there should be commas
+                let result = text;
+                
+                // Fix missing commas between object properties
+                // Pattern: "key":"value" "key":"value" -> "key":"value", "key":"value"
+                result = result.replace(/"([^"]*)"\s*:\s*"([^"]*)"\s+"([^"]*)"\s*:/g, '"$1":"$2", "$3":');
+                
+                // Fix missing commas between object properties with numbers
+                // Pattern: "key":123 "key":"value" -> "key":123, "key":"value"
+                result = result.replace(/"([^"]*)"\s*:\s*([0-9.-]+)\s+"([^"]*)"\s*:/g, '"$1":$2, "$3":');
+                
+                // Fix missing commas between array elements
+                // Pattern: "value" "value" -> "value", "value"
+                result = result.replace(/"([^"]*)"\s+"([^"]*)"\s*([,\]])/g, '"$1", "$2"$3');
+                
+                // Fix missing commas between numbers in arrays
+                // Pattern: 123 456 -> 123, 456
+                result = result.replace(/([0-9.-]+)\s+([0-9.-]+)\s*([,\]])/g, '$1, $2$3');
+                
+                // Generic fix for missing commas between object properties
+                // Pattern: } "key": -> }, "key":
+                result = result.replace(/\}\s+"([^"]*)"\s*:/g, '}, "$1":');
+                
+                return result;
+            }
+
+            balanceBracketsElaborate(text) {
+                const stack = [];
+                const positions = [];
+                let inString = false;
+                let escapeNext = false;
+                let result = text;
+                
+                // First pass: analyze bracket structure
+                for (let i = 0; i < text.length; i++) {
+                    const char = text[i];
+                    
+                    if (escapeNext) {
+                        escapeNext = false;
+                        continue;
+                    }
+                    
+                    if (char === '\\') {
+                        escapeNext = true;
+                        continue;
+                    }
+                    
+                    if (char === '"') {
+                        inString = !inString;
+                        continue;
+                    }
+                    
+                    if (inString) continue;
+                    
+                    if (char === '{' || char === '[') {
+                        stack.push({ char, position: i });
+                    } else if (char === '}' || char === ']') {
+                        const expected = char === '}' ? '{' : '[';
+                        if (stack.length > 0 && stack[stack.length - 1].char === expected) {
+                            stack.pop();
+                        }
+                    }
+                }
+                
+                // Second pass: fix common bracket issues
+                
+                // Fix missing opening brackets by adding them at the beginning
+                let missingOpening = 0;
+                for (let i = stack.length - 1; i >= 0; i--) {
+                    const bracket = stack[i];
+                    if (bracket.char === '}') {
+                        missingOpening++;
+                    }
+                }
+                if (missingOpening > 0) {
+                    result = '{'.repeat(missingOpening) + result;
+                }
+                
+                // Fix missing opening square brackets
+                missingOpening = 0;
+                for (let i = stack.length - 1; i >= 0; i--) {
+                    const bracket = stack[i];
+                    if (bracket.char === ']') {
+                        missingOpening++;
+                    }
+                }
+                if (missingOpening > 0) {
+                    result = '['.repeat(missingOpening) + result;
+                }
+                
+                // Add missing closing brackets/braces at the end
+                for (let i = stack.length - 1; i >= 0; i--) {
+                    const bracket = stack[i];
+                    const closing = bracket.char === '{' ? '}' : ']';
+                    result += closing;
+                }
+                
+                // Fix common bracket placement issues
+                result = result.replace(/\}\s*\[/g, '},['); // Fix } followed by [
+                result = result.replace(/\]\s*\{/g, '],{'); // Fix ] followed by {
+                result = result.replace(/\}\s*\{/g, '},{'); // Fix } followed by {
+                result = result.replace(/\]\s*\[/g, '],['); // Fix ] followed by [
+                
+                return result;
+            }
+
+            // Removed fixGeoJSONSpecificIssues as it was causing issues
+
+            finalCleanup(text) {
+                // Remove any remaining problematic characters
+                text = text.replace(/\s+/g, ' '); // Final whitespace cleanup
+                
+                // Ensure proper spacing around brackets
+                text = text.replace(/\s*([{}[\]])\s*/g, '$1');
+                
+                return text.trim();
+            }
+
+            formatJSON() {
+                const editor = document.getElementById('jsonEditor');
+                try {
+                    const parsed = JSON.parse(editor.value);
+                    editor.value = JSON.stringify(parsed, null, 2);
+                    this.updateLineNumbers();
+                    this.showSuccess(this.getTranslation('jsonFormattedSuccess'));
+                } catch (error) {
+                    this.showError(this.getTranslation('cannotFormatInvalidJSON'));
+                }
+            }
+
+            analyzeData() {
+                if (!this.rawData) return;
+
+                let featureCount = 0;
+                let polygonCount = 0;
+                let multiPolygonCount = 0;
+                let pointCount = 0;
+                let properties = new Set();
+
+                // Normalize to FeatureCollection format for analysis
+                const features = this.extractFeatures(this.rawData);
+                
+                features.forEach(feature => {
+                    featureCount++;
+                    
+                    if (feature.geometry) {
+                        if (feature.geometry.type === 'Polygon') {
+                            polygonCount++;
+                        } else if (feature.geometry.type === 'MultiPolygon') {
+                            multiPolygonCount++;
+                        } else if (feature.geometry.type === 'Point') {
+                            pointCount++;
+                        }
+                    }
+
+                    if (feature.properties) {
+                        Object.keys(feature.properties).forEach(key => properties.add(key));
+                    }
+                });
+
+                this.updateStats(featureCount, polygonCount, multiPolygonCount, pointCount, this.errors.length);
+                this.setupPropertyMapping(Array.from(properties));
+                document.getElementById('fileStats').classList.remove('hidden');
+                document.getElementById('propertyMapping').classList.remove('hidden');
+            }
+
+            updateStats(features, polygons, multiPolygons, points, errors) {
+                document.getElementById('featureCount').textContent = features;
+                document.getElementById('polygonCount').textContent = polygons;
+                document.getElementById('multiPolygonCount').textContent = multiPolygons;
+                document.getElementById('pointCount').textContent = points;
+                document.getElementById('errorCount').textContent = errors;
+            }
+
+            setupPropertyMapping(existingProperties) {
+                const predefinedFields = ['ProducerName', 'ProductionPlace', 'Area', 'ProducerCountry', 'AdditionalInfo'];
+                const propertyList = document.getElementById('propertyList');
+                propertyList.innerHTML = '';
+
+                existingProperties.forEach(prop => {
+                    const row = document.createElement('div');
+                    row.className = 'property-row';
+                    row.innerHTML = `
+                        <input type="text" value="${prop}" readonly>
+                        <span>→</span>
+                        <select data-source="${prop}">
+                            <option value="">${this.getTranslation('discardPropertyInformation')}</option>
+                            ${predefinedFields.map(field => 
+                                `<option value="${field}" ${field === prop ? 'selected' : ''}>${field}</option>`
+                            ).join('')}
+                            <option value="custom">${this.getTranslation('customFieldName')}</option>
+                        </select>
+                        <input type="text" placeholder="${this.getTranslation('customFieldName')}" style="display: none;" data-custom="${prop}">
+                    `;
+                    propertyList.appendChild(row);
+
+                    const select = row.querySelector('select');
+                    const customInput = row.querySelector('input[data-custom]');
+                    
+                    select.addEventListener('change', (e) => {
+                        if (e.target.value === 'custom') {
+                            customInput.style.display = 'block';
+                            customInput.focus();
+                        } else {
+                            customInput.style.display = 'none';
+                        }
+                    });
+                });
+            }
+
+            addStaticField() {
+                const staticFieldsList = document.getElementById('staticFieldsList');
+                const predefinedFields = ['ProducerName', 'ProductionPlace', 'Area', 'ProducerCountry', 'AdditionalInfo'];
+                
+                const row = document.createElement('div');
+                row.className = 'static-field-row';
+                row.innerHTML = `
+                    <select>
+                        <option value="">${this.getTranslation('selectField')}</option>
+                        ${predefinedFields.map(field => `<option value="${field}">${field}</option>`).join('')}
+                        <option value="custom">${this.getTranslation('customField')}</option>
+                    </select>
+                    <input type="text" placeholder="${this.getTranslation('customFieldName')}" style="display: none;">
+                    <input type="text" placeholder="${this.getTranslation('staticValue')}">
+                    <button type="button" onclick="this.parentElement.remove()">
+                        🗑️
+                    </button>
+                `;
+                staticFieldsList.appendChild(row);
+
+                const select = row.querySelector('select');
+                const customInput = row.querySelector('input[placeholder="' + this.getTranslation('customFieldName') + '"]');
+                
+                select.addEventListener('change', (e) => {
+                    if (e.target.value === 'custom') {
+                        customInput.style.display = 'block';
+                        customInput.focus();
+                    } else {
+                        customInput.style.display = 'none';
+                    }
+                });
+            }
+
+            extractFeatures(data) {
+                const features = [];
+
+                if (data.type === 'FeatureCollection') {
+                    return data.features || [];
+                } else if (data.type === 'Feature') {
+                    return [data];
+                } else if (data.type && ['Point', 'LineString', 'Polygon', 'MultiPoint', 'MultiLineString', 'MultiPolygon'].includes(data.type)) {
+                    // Raw geometry object
+                    return [{
+                        type: 'Feature',
+                        geometry: data,
+                        properties: {}
+                    }];
+                } else if (Array.isArray(data)) {
+                    // Array of features or geometries
+                    data.forEach(item => {
+                        features.push(...this.extractFeatures(item));
+                    });
+                }
+
+                return features;
+            }
+
+            async processGeoJSON() {
+                if (!this.rawData) {
+                    this.showError(this.getTranslation('noValidDataToProcess'));
+                    return;
+                }
+
+                this.showLoading(true);
+                this.updateProgress(0);
+
+                try {
+                    // Extract features
+                    let features = this.extractFeatures(this.rawData);
+                    this.updateProgress(20);
+
+                    // Collect property mappings
+                    this.collectPropertyMappings();
+                    this.collectStaticFields();
+                    this.updateProgress(40);
+
+                    // Process features
+                    const processedFeatures = [];
+                    for (let i = 0; i < features.length; i++) {
+                        const feature = features[i];
+                        
+                        // Split MultiPolygons if requested
+                        if (document.getElementById('splitMultiPolygons').checked && 
+                            feature.geometry && feature.geometry.type === 'MultiPolygon') {
+                            const splitFeatures = this.splitMultiPolygon(feature);
+                            processedFeatures.push(...splitFeatures);
+                        } else {
+                            processedFeatures.push(this.processFeature(feature));
+                        }
+                        
+                        this.updateProgress(40 + (i / features.length) * 40);
+                    }
+
+                    // Create final GeoJSON
+                    this.processedData = {
+                        type: 'FeatureCollection',
+                        features: processedFeatures
+                    };
+
+                    this.updateProgress(100);
+                    this.showSuccess(this.getTranslation('successfullyProcessed') + processedFeatures.length + this.getTranslation('featuresCount'));
+                    
+                    // Automatically download the processed file
+                    this.downloadResult();
+                    
+                } catch (error) {
+                    this.showError(this.getTranslation('processingFailed') + error.message);
+                } finally {
+                    this.showLoading(false);
+                }
+            }
+
+            collectPropertyMappings() {
+                this.propertyMappings.clear();
+                this.discardedProperties = new Set(); // Track discarded properties
+                
+                const propertyRows = document.querySelectorAll('#propertyList .property-row');
+                propertyRows.forEach(row => {
+                    const sourceField = row.querySelector('input[readonly]').value;
+                    const select = row.querySelector('select');
+                    const customInput = row.querySelector('input[data-custom]');
+                    
+                    let targetField = select.value;
+                    if (targetField === 'custom' && customInput.value.trim()) {
+                        targetField = customInput.value.trim();
+                    }
+                    
+                    if (targetField && targetField !== '') {
+                        this.propertyMappings.set(sourceField, targetField);
+                    } else {
+                        // If targetField is empty, mark this property as discarded
+                        this.discardedProperties.add(sourceField);
+                    }
+                });
+            }
+
+            collectStaticFields() {
+                this.staticFields.clear();
+                
+                const staticRows = document.querySelectorAll('#staticFieldsList .static-field-row');
+                staticRows.forEach(row => {
+                    const select = row.querySelector('select');
+                    const customInput = row.querySelector('input[placeholder="' + this.getTranslation('customFieldName') + '"]');
+                    const valueInput = row.querySelector('input[placeholder="' + this.getTranslation('staticValue') + '"]');
+                    
+                    let fieldName = select.value;
+                    if (fieldName === 'custom' && customInput.value.trim()) {
+                        fieldName = customInput.value.trim();
+                    }
+                    
+                    if (fieldName && valueInput.value.trim()) {
+                        this.staticFields.set(fieldName, valueInput.value.trim());
+                    }
+                });
+            }
+
+            splitMultiPolygon(feature) {
+                const multiPolygon = feature.geometry;
+                const splitFeatures = [];
+
+                multiPolygon.coordinates.forEach((polygonCoords, index) => {
+                    const newFeature = {
+                        type: 'Feature',
+                        geometry: {
+                            type: 'Polygon',
+                            coordinates: polygonCoords
+                        },
+                        properties: { ...feature.properties }
+                    };
+                    
+                    // Add index to distinguish split features
+                    if (feature.properties.id) {
+                        newFeature.properties.id = `${feature.properties.id}_${index + 1}`;
+                    }
+                    
+                    splitFeatures.push(this.processFeature(newFeature));
+                });
+
+                return splitFeatures;
+            }
+
+            processFeature(feature) {
+                const processedFeature = {
+                    type: 'Feature',
+                    geometry: feature.geometry,
+                    properties: {}
+                };
+
+                // Apply property mappings
+                if (feature.properties) {
+                    Object.entries(feature.properties).forEach(([key, value]) => {
+                        // Skip discarded properties
+                        if (this.discardedProperties && this.discardedProperties.has(key)) {
+                            return;
+                        }
+                        const mappedKey = this.propertyMappings.get(key) || key;
+                        processedFeature.properties[mappedKey] = value;
+                    });
+                }
+
+                // Apply static fields
+                this.staticFields.forEach((value, key) => {
+                    processedFeature.properties[key] = value;
+                });
+
+                // Validate geometry if requested
+                if (document.getElementById('validateGeometry').checked) {
+                    processedFeature.geometry = this.validateAndFixGeometry(processedFeature.geometry);
+                }
+
+                return processedFeature;
+            }
+
+            validateAndFixGeometry(geometry) {
+                if (!geometry || !geometry.coordinates) {
+                    return geometry;
+                }
+
+                // Basic validation and fixes
+                try {
+                    if (geometry.type === 'Polygon') {
+                        // Ensure first and last coordinates are the same
+                        geometry.coordinates.forEach(ring => {
+                            if (ring.length > 0) {
+                                const first = ring[0];
+                                const last = ring[ring.length - 1];
+                                if (first[0] !== last[0] || first[1] !== last[1]) {
+                                    ring.push([first[0], first[1]]);
+                                }
+                            }
+                        });
+                    }
+                } catch (error) {
+                    console.warn('Geometry validation failed:', error);
+                }
+
+                return geometry;
+            }
+
+            downloadResult() {
+                if (!this.processedData) {
+                    this.showError(this.getTranslation('noProcessedDataToDownload'));
+                    return;
+                }
+
+                const blob = new Blob([JSON.stringify(this.processedData, null, 2)], {
+                    type: 'application/json'
+                });
+                
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'processed_EUDR_file.geojson';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+
+            reset() {
+                // Clear data
+                this.rawData = null;
+                this.processedData = null;
+                this.errors = [];
+                this.warnings = [];
+                this.staticFields.clear();
+                this.propertyMappings.clear();
+                this.discardedProperties.clear();
+
+                // Clear editor and update line numbers
+                const editor = document.getElementById('jsonEditor');
+                editor.value = '';
+                this.updateLineNumbers();
+                
+                // Clear error messages
+                document.getElementById('errorMessages').innerHTML = '';
+                
+                // Hide sections
+                document.getElementById('editorSection').classList.add('hidden');
+                document.getElementById('fileStats').classList.add('hidden');
+                document.getElementById('staticFields').classList.add('hidden');
+                document.getElementById('propertyMapping').classList.add('hidden');
+                document.getElementById('processingOptions').classList.add('hidden');
+                document.getElementById('actionButtons').classList.add('hidden');
+                document.getElementById('progressBar').classList.add('hidden');
+                
+                // Clear dynamic content
+                document.getElementById('staticFieldsList').innerHTML = '';
+                document.getElementById('propertyList').innerHTML = '';
+                
+                // Reset file input
+                document.getElementById('fileInput').value = '';
+                
+                // Reset editor container styling
+                document.getElementById('jsonEditorContainer').classList.remove('has-error');
+                editor.classList.remove('has-error');
+                
+                // Clear any validation timeout
+                if (this.validateTimeout) {
+                    clearTimeout(this.validateTimeout);
+                }
+            }
+
+            handleEditorChange() {
+                // Update line numbers immediately on change
+                this.updateLineNumbers();
+                
+                // Auto-validate on change with debounce
+                clearTimeout(this.validateTimeout);
+                this.validateTimeout = setTimeout(() => {
+                    this.validateJSON();
+                }, 1000);
+            }
+
+            showError(message) {
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message';
+                errorDiv.innerHTML = `⚠️ ${message}`;
+                
+                const container = document.getElementById('errorMessages');
+                container.innerHTML = '';
+                container.appendChild(errorDiv);
+            }
+
+            showSuccess(message) {
+                const successDiv = document.createElement('div');
+                successDiv.className = 'success-message';
+                successDiv.innerHTML = `✔️ ${message}`;
+                
+                const container = document.getElementById('errorMessages');
+                container.innerHTML = '';
+                container.appendChild(successDiv);
+            }
+
+            getTranslation(key) {
+                return translations[this.currentLanguage][key] || key;
+            }
+
+            showWarning(message) {
+                const warningDiv = document.createElement('div');
+                warningDiv.className = 'warning-message';
+                warningDiv.innerHTML = `⚠️ ${message}`;
+                
+                const container = document.getElementById('errorMessages');
+                container.appendChild(warningDiv);
+            }
+
+            clearErrors() {
+                document.getElementById('errorMessages').innerHTML = '';
+            }
+
+            showLoading(show) {
+                const overlay = document.getElementById('loadingOverlay');
+                if (show) {
+                    overlay.classList.add('show');
+                }
+                else {
+                    overlay.classList.remove('show');
+                }
+            }
+
+            updateProgress(percent) {
+                const progressBar = document.getElementById('progressBar');
+                const progressFill = document.getElementById('progressFill');
+                
+                if (percent > 0) {
+                    progressBar.classList.remove('hidden');
+                    progressFill.style.width = percent + '%';
+                    
+                    if (percent >= 100) {
+                        setTimeout(() => {
+                            progressBar.classList.add('hidden');
+                        }, 1000);
+                    }
+                }
+            }
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
+
+        // Main app initialization
+        function initializeApp() {
+            const converter = new GeoJSONConverter();
+            
+            // Force clear editor on page load/refresh to prevent browser retention
+            const editor = document.getElementById('jsonEditor');
+            if (editor) {
+                editor.value = '';
+                converter.updateLineNumbers();
+            }
+        }
+
+
+    </script>
+</body>
+</html>
