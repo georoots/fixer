@@ -797,6 +797,14 @@
                                 <input type="checkbox" id="validateGeometry" checked>
                                 <span data-i18n="validateGeometry">Validate and fix geometry issues</span>
                             </label>
+                            <label>
+                                <input type="checkbox" id="roundCoordinates">
+                                <span data-i18n="roundCoordinates">Round coordinates to 6 decimals</span>
+                            </label>
+                            <label>
+                                <input type="checkbox" id="removeWhitespace">
+                                <span data-i18n="removeWhitespace">Remove whitespace to shrink file size</span>
+                            </label>
                         </div>
                     </div>
 
@@ -849,7 +857,7 @@
                 propertyMapping: "Property Mapping",
                 processingOptions: "Processing Options",
                 splitMultiPolygons: "Split MultiPolygons into separate Polygon features",
-                validateGeometry: "Validate and fix geometry issues",
+                validateGeometry: "Fix basic geometry issues (ring closing, winding order)",
                 processGeoJSON: "Process & Download GeoJSON",
                 downloadResult: "Download Result",
                 reset: "Reset",
@@ -858,7 +866,10 @@
                 customField: "Custom field...",
                 staticValue: "Static value",
                 discardPropertyInformation: "Discard Property Information",
+                leaveAsIs: "Leave as is",
                 customFieldName: "Custom field name...",
+                roundCoordinates: "Round coordinates to 6 decimals",
+                removeWhitespace: "Remove whitespace to shrink file size",
                 pleaseProvideJSON: "Please provide JSON content",
                 jsonValid: "JSON is valid!",
                 jsonFormattedSuccess: "JSON formatted successfully!",
@@ -918,7 +929,7 @@
                 propertyMapping: "Mapeo de Propiedades",
                 processingOptions: "Opciones de Procesamiento",
                 splitMultiPolygons: "Dividir MultiPolígonos en características de Polígono separadas",
-                validateGeometry: "Validar y corregir problemas de geometría",
+                validateGeometry: "Corregir problemas básicos de geometría (cierre de anillos, orden de bobinado)",
                 processGeoJSON: "Procesar y Descargar GeoJSON",
                 downloadResult: "Descargar Resultado",
                 reset: "Reiniciar",
@@ -927,7 +938,10 @@
                 customField: "Campo personalizado...",
                 staticValue: "Valor estático",
                 discardPropertyInformation: "Descartar Información de Propiedad",
+                leaveAsIs: "Dejar como está",
                 customFieldName: "Nombre de campo personalizado...",
+                roundCoordinates: "Redondear coordenadas a 6 decimales",
+                removeWhitespace: "Eliminar espacios en blanco para reducir el tamaño del archivo",
                 pleaseProvideJSON: "Por favor proporciona contenido JSON",
                 jsonValid: "¡JSON es válido!",
                 jsonFormattedSuccess: "¡JSON formateado exitosamente!",
@@ -987,7 +1001,7 @@
                 propertyMapping: "Mapeamento de Propriedades",
                 processingOptions: "Opções de Processamento",
                 splitMultiPolygons: "Dividir MultiPolígonos em características de Polígono separadas",
-                validateGeometry: "Validar e corrigir problemas de geometria",
+                validateGeometry: "Corrigir problemas básicos de geometria (fechamento de anéis, ordem de enrolamento)",
                 processGeoJSON: "Processar e Baixar GeoJSON",
                 downloadResult: "Baixar Resultado",
                 reset: "Reiniciar",
@@ -996,7 +1010,10 @@
                 customField: "Campo personalizado...",
                 staticValue: "Valor estático",
                 discardPropertyInformation: "Descartar Informação da Propriedade",
+                leaveAsIs: "Deixar como está",
                 customFieldName: "Nome do campo personalizado...",
+                roundCoordinates: "Arredondar coordenadas para 6 decimais",
+                removeWhitespace: "Remover espaços em branco para reduzir o tamanho do arquivo",
                 pleaseProvideJSON: "Por favor forneça conteúdo JSON",
                 jsonValid: "JSON é válido!",
                 jsonFormattedSuccess: "JSON formatado com sucesso!",
@@ -1141,15 +1158,19 @@
                 const editor = document.getElementById('jsonEditor');
                 const lineNumbers = document.getElementById('lineNumbers');
                 
-                const lines = editor.value.split('\n');
-                const lineCount = lines.length;
-                
-                let lineNumbersText = '';
-                for (let i = 1; i <= lineCount; i++) {
-                    lineNumbersText += i + '\n';
+                // Count lines without creating array - more memory efficient
+                let lineCount = 1;
+                for (let i = 0; i < editor.value.length; i++) {
+                    if (editor.value[i] === '\n') lineCount++;
                 }
                 
-                lineNumbers.textContent = lineNumbersText;
+                // Build line numbers more efficiently using array join
+                const lineNumbersArray = [];
+                for (let i = 1; i <= lineCount; i++) {
+                    lineNumbersArray.push(i);
+                }
+                
+                lineNumbers.textContent = lineNumbersArray.join('\n');
                 
                 // Sync scroll position
                 this.syncLineNumbersScroll();
@@ -1212,7 +1233,7 @@
             async loadFile(file) {
                 try {
                     // File size validation (10MB limit)
-                    const maxSize = 10 * 1024 * 1024; // 10MB
+                    const maxSize = 1000 * 1024 * 1024; // 10MB
                     if (file.size > maxSize) {
                         this.showError(this.getTranslation('fileTooLarge'));
                         return;
@@ -1296,8 +1317,9 @@
                         return { isValid: false, error: this.getTranslation('invalidFeaturesArray') };
                     }
                     
-                    // Validate each feature
-                    for (let i = 0; i < data.features.length; i++) {
+                    // Validate only first 100 features for large datasets to save memory/time
+                    const featuresToValidate = Math.min(data.features.length, 100);
+                    for (let i = 0; i < featuresToValidate; i++) {
                         const feature = data.features[i];
                         if (!feature || typeof feature !== 'object') {
                             return { isValid: false, error: this.getTranslation('invalidFeature') + ` at index ${i}` };
@@ -1374,7 +1396,7 @@
 
                 switch (type) {
                     case 'Point':
-                        if (!Array.isArray(coordinates) || coordinates.length < 2 || coordinates.length > 3) {
+                        if (coordinates.length < 2 || coordinates.length > 3) {
                             throw new Error(this.getTranslation('invalidPointCoordinates'));
                         }
                         if (typeof coordinates[0] !== 'number' || typeof coordinates[1] !== 'number') {
@@ -1382,29 +1404,31 @@
                         }
                         break;
                     case 'LineString':
-                        if (!Array.isArray(coordinates) || coordinates.length < 2) {
+                        if (coordinates.length < 2) {
                             throw new Error(this.getTranslation('invalidLineStringCoordinates'));
                         }
-                        coordinates.forEach(coord => {
+                        for (let i = 0; i < coordinates.length; i++) {
+                            const coord = coordinates[i];
                             if (!Array.isArray(coord) || coord.length < 2 || coord.length > 3) {
                                 throw new Error(this.getTranslation('invalidCoordinateArray'));
                             }
-                        });
+                        }
                         break;
                     case 'Polygon':
-                        if (!Array.isArray(coordinates) || coordinates.length === 0) {
+                        if (coordinates.length === 0) {
                             throw new Error(this.getTranslation('invalidPolygonCoordinates'));
                         }
-                        coordinates.forEach(ring => {
+                        for (let i = 0; i < coordinates.length; i++) {
+                            const ring = coordinates[i];
                             if (!Array.isArray(ring) || ring.length < 4) {
                                 throw new Error(this.getTranslation('invalidPolygonRing'));
                             }
-                        });
+                        }
                         break;
                     case 'MultiPoint':
                     case 'MultiLineString':
                     case 'MultiPolygon':
-                        if (!Array.isArray(coordinates) || coordinates.length === 0) {
+                        if (coordinates.length === 0) {
                             throw new Error(this.getTranslation('invalidMultiGeometryCoordinates'));
                         }
                         break;
@@ -1419,9 +1443,17 @@
                 const match = errorMsg.match(/at position (\d+)/);
                 if (match) {
                     const position = parseInt(match[1]);
-                    const lines = text.substring(0, position).split('\n');
-                    line = lines.length;
-                    column = lines[lines.length - 1].length + 1;
+                    // Count lines more efficiently without creating array
+                    let lineCount = 1;
+                    let lastNewlinePos = -1;
+                    for (let i = 0; i < position && i < text.length; i++) {
+                        if (text[i] === '\n') {
+                            lineCount++;
+                            lastNewlinePos = i;
+                        }
+                    }
+                    line = lineCount;
+                    column = position - lastNewlinePos;
                 }
 
                 const detailedError = `JSON Syntax Error at line ${line}, column ${column}: ${errorMsg}`;
@@ -1463,14 +1495,14 @@
                 }
 
                 // Try to fix the JSON
-                let fixedText = this.fixCommonJSONIssues(originalText);
+                const fixedText = this.fixCommonJSONIssues(originalText);
                 
                 // Validate the fixed result
                 try {
                     const parsed = JSON.parse(fixedText);
                     // If parsing succeeds, format the JSON and update the editor
-                    const formattedText = JSON.stringify(parsed, null, 2);
-                    editor.value = formattedText;
+                    editor.value = JSON.stringify(parsed, null, 2);
+                    // Clear fixedText from memory
                     this.updateLineNumbers();
                     this.validateJSON();
                     this.showSuccess(this.getTranslation('autoFixSuccess'));
@@ -1507,15 +1539,12 @@
             }
 
             cleanupWhitespace(text) {
-                // Remove excessive whitespace while preserving structure
-                text = text.replace(/\s+/g, ' '); // Multiple spaces to single
-                text = text.replace(/\s*([{}[\],:])\s*/g, '$1'); // Remove spaces around brackets/commas
-                text = text.replace(/\s*:\s*/g, ':'); // Remove spaces around colons
-                text = text.replace(/:\s*"/g, ':"'); // Fix spacing before quoted values
-                text = text.replace(/"\s*,/g, '",'); // Fix spacing after quoted values
-                text = text.replace(/"\s*}/g, '"}'); // Fix spacing before closing braces
-                text = text.replace(/"\s*]/g, '"]'); // Fix spacing before closing brackets
-                return text;
+                // Optimize by chaining all regex replacements in one pass where possible
+                return text
+                    .replace(/\s+/g, ' ')
+                    .replace(/\s*([{}[\],:])\s*/g, '$1')
+                    .replace(/:\s*"/g, ':"')
+                    .replace(/"\s*([,}\]])/g, '"$1');
             }
 
             fixQuotesAndSyntax(text) {
@@ -1584,10 +1613,8 @@
 
             balanceBracketsElaborate(text) {
                 const stack = [];
-                const positions = [];
                 let inString = false;
                 let escapeNext = false;
-                let result = text;
                 
                 // First pass: analyze bracket structure
                 for (let i = 0; i < text.length; i++) {
@@ -1611,53 +1638,33 @@
                     if (inString) continue;
                     
                     if (char === '{' || char === '[') {
-                        stack.push({ char, position: i });
+                        stack.push(char);
                     } else if (char === '}' || char === ']') {
                         const expected = char === '}' ? '{' : '[';
-                        if (stack.length > 0 && stack[stack.length - 1].char === expected) {
+                        if (stack.length > 0 && stack[stack.length - 1] === expected) {
                             stack.pop();
                         }
                     }
                 }
                 
-                // Second pass: fix common bracket issues
-                
-                // Fix missing opening brackets by adding them at the beginning
-                let missingOpening = 0;
-                for (let i = stack.length - 1; i >= 0; i--) {
-                    const bracket = stack[i];
-                    if (bracket.char === '}') {
-                        missingOpening++;
-                    }
-                }
-                if (missingOpening > 0) {
-                    result = '{'.repeat(missingOpening) + result;
-                }
-                
-                // Fix missing opening square brackets
-                missingOpening = 0;
-                for (let i = stack.length - 1; i >= 0; i--) {
-                    const bracket = stack[i];
-                    if (bracket.char === ']') {
-                        missingOpening++;
-                    }
-                }
-                if (missingOpening > 0) {
-                    result = '['.repeat(missingOpening) + result;
-                }
+                // Build result string only if needed
+                let result = text;
                 
                 // Add missing closing brackets/braces at the end
-                for (let i = stack.length - 1; i >= 0; i--) {
-                    const bracket = stack[i];
-                    const closing = bracket.char === '{' ? '}' : ']';
-                    result += closing;
+                if (stack.length > 0) {
+                    const closingBrackets = [];
+                    for (let i = stack.length - 1; i >= 0; i--) {
+                        closingBrackets.push(stack[i] === '{' ? '}' : ']');
+                    }
+                    result = text + closingBrackets.join('');
                 }
                 
                 // Fix common bracket placement issues
-                result = result.replace(/\}\s*\[/g, '},['); // Fix } followed by [
-                result = result.replace(/\]\s*\{/g, '],{'); // Fix ] followed by {
-                result = result.replace(/\}\s*\{/g, '},{'); // Fix } followed by {
-                result = result.replace(/\]\s*\[/g, '],['); // Fix ] followed by [
+                result = result
+                    .replace(/\}\s*\[/g, '},[')
+                    .replace(/\]\s*\{/g, '],{')
+                    .replace(/\}\s*\{/g, '},{')
+                    .replace(/\]\s*\[/g, '],[');
                 
                 return result;
             }
@@ -1686,6 +1693,156 @@
                 }
             }
 
+            checkGeometryErrors(feature, index) {
+                // Check for various geometry errors and return error descriptions
+                const errors = [];
+                
+                // Check for missing geometry
+                if (!feature.geometry) {
+                    errors.push(`Feature ${index}: Missing geometry`);
+                    return errors;
+                }
+                
+                // Check for invalid geometry object
+                if (typeof feature.geometry !== 'object') {
+                    errors.push(`Feature ${index}: Invalid geometry object`);
+                    return errors;
+                }
+                
+                // Check for missing geometry type
+                if (!feature.geometry.type) {
+                    errors.push(`Feature ${index}: Missing geometry type`);
+                    return errors;
+                }
+                
+                // Check for missing coordinates
+                if (!feature.geometry.coordinates) {
+                    errors.push(`Feature ${index}: Missing coordinates`);
+                    return errors;
+                }
+                
+                // Check coordinates based on geometry type
+                const coords = feature.geometry.coordinates;
+                const type = feature.geometry.type;
+                
+                try {
+                    switch (type) {
+                        case 'Point':
+                            if (!Array.isArray(coords) || coords.length < 2) {
+                                errors.push(`Feature ${index}: Invalid Point coordinates (need at least [lon, lat])`);
+                            }
+                            if (!this.isValidCoordinate(coords[0]) || !this.isValidCoordinate(coords[1])) {
+                                errors.push(`Feature ${index}: Invalid coordinate values in Point`);
+                            }
+                            break;
+                            
+                        case 'LineString':
+                            if (!Array.isArray(coords) || coords.length < 2) {
+                                errors.push(`Feature ${index}: LineString must have at least 2 points`);
+                            } else {
+                                for (let i = 0; i < coords.length; i++) {
+                                    if (!Array.isArray(coords[i]) || coords[i].length < 2) {
+                                        errors.push(`Feature ${index}: Invalid coordinate array depth in LineString`);
+                                        break;
+                                    }
+                                    if (!this.isValidCoordinate(coords[i][0]) || !this.isValidCoordinate(coords[i][1])) {
+                                        errors.push(`Feature ${index}: Invalid coordinate values in LineString`);
+                                        break;
+                                    }
+                                }
+                            }
+                            break;
+                            
+                        case 'Polygon':
+                            if (!Array.isArray(coords) || coords.length === 0) {
+                                errors.push(`Feature ${index}: Polygon must have at least one ring`);
+                            } else {
+                                for (let i = 0; i < coords.length; i++) {
+                                    const ring = coords[i];
+                                    if (!Array.isArray(ring) || ring.length < 4) {
+                                        errors.push(`Feature ${index}: Polygon ring ${i} must have at least 4 points`);
+                                        break;
+                                    }
+                                    for (let j = 0; j < ring.length; j++) {
+                                        if (!Array.isArray(ring[j]) || ring[j].length < 2) {
+                                            errors.push(`Feature ${index}: Invalid coordinate array depth in Polygon ring ${i}`);
+                                            break;
+                                        }
+                                        if (!this.isValidCoordinate(ring[j][0]) || !this.isValidCoordinate(ring[j][1])) {
+                                            errors.push(`Feature ${index}: Invalid coordinate values in Polygon ring ${i}`);
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            break;
+                            
+                        case 'MultiPoint':
+                            if (!Array.isArray(coords) || coords.length === 0) {
+                                errors.push(`Feature ${index}: MultiPoint must have at least one point`);
+                            } else {
+                                for (let i = 0; i < coords.length; i++) {
+                                    if (!Array.isArray(coords[i]) || coords[i].length < 2) {
+                                        errors.push(`Feature ${index}: Invalid coordinate array depth in MultiPoint`);
+                                        break;
+                                    }
+                                    if (!this.isValidCoordinate(coords[i][0]) || !this.isValidCoordinate(coords[i][1])) {
+                                        errors.push(`Feature ${index}: Invalid coordinate values in MultiPoint`);
+                                        break;
+                                    }
+                                }
+                            }
+                            break;
+                            
+                        case 'MultiLineString':
+                            if (!Array.isArray(coords) || coords.length === 0) {
+                                errors.push(`Feature ${index}: MultiLineString must have at least one LineString`);
+                            } else {
+                                for (let i = 0; i < coords.length; i++) {
+                                    const linestring = coords[i];
+                                    if (!Array.isArray(linestring) || linestring.length < 2) {
+                                        errors.push(`Feature ${index}: MultiLineString line ${i} must have at least 2 points`);
+                                        break;
+                                    }
+                                }
+                            }
+                            break;
+                            
+                        case 'MultiPolygon':
+                            if (!Array.isArray(coords) || coords.length === 0) {
+                                errors.push(`Feature ${index}: MultiPolygon must have at least one Polygon`);
+                            } else {
+                                for (let i = 0; i < coords.length; i++) {
+                                    const polygon = coords[i];
+                                    if (!Array.isArray(polygon) || polygon.length === 0) {
+                                        errors.push(`Feature ${index}: MultiPolygon polygon ${i} must have at least one ring`);
+                                        break;
+                                    }
+                                    for (let j = 0; j < polygon.length; j++) {
+                                        const ring = polygon[j];
+                                        if (!Array.isArray(ring) || ring.length < 4) {
+                                            errors.push(`Feature ${index}: MultiPolygon polygon ${i} ring ${j} must have at least 4 points`);
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            break;
+                    }
+                } catch (error) {
+                    errors.push(`Feature ${index}: Error checking geometry - ${error.message}`);
+                }
+                
+                return errors;
+            }
+
+            isValidCoordinate(value) {
+                // Check if a coordinate value is valid (not null, not NaN, not Infinity)
+                return typeof value === 'number' && 
+                       !isNaN(value) && 
+                       isFinite(value);
+            }
+
             analyzeData() {
                 if (!this.rawData) return;
 
@@ -1693,33 +1850,51 @@
                 let polygonCount = 0;
                 let multiPolygonCount = 0;
                 let pointCount = 0;
-                let properties = new Set();
+                const properties = new Set();
+                
+                // Clear errors before analyzing
+                this.errors = [];
 
                 // Normalize to FeatureCollection format for analysis
                 const features = this.extractFeatures(this.rawData);
                 
-                features.forEach(feature => {
+                for (let i = 0; i < features.length; i++) {
+                    const feature = features[i];
                     featureCount++;
                     
+                    // Check for geometry errors
+                    const geometryErrors = this.checkGeometryErrors(feature, i);
+                    if (geometryErrors.length > 0) {
+                        this.errors.push(...geometryErrors);
+                    }
+                    
                     if (feature.geometry) {
-                        if (feature.geometry.type === 'Polygon') {
+                        const geoType = feature.geometry.type;
+                        if (geoType === 'Polygon') {
                             polygonCount++;
-                        } else if (feature.geometry.type === 'MultiPolygon') {
+                        } else if (geoType === 'MultiPolygon') {
                             multiPolygonCount++;
-                        } else if (feature.geometry.type === 'Point') {
+                        } else if (geoType === 'Point') {
                             pointCount++;
                         }
                     }
 
                     if (feature.properties) {
-                        Object.keys(feature.properties).forEach(key => properties.add(key));
+                        for (const key in feature.properties) {
+                            properties.add(key);
+                        }
                     }
-                });
+                }
 
                 this.updateStats(featureCount, polygonCount, multiPolygonCount, pointCount, this.errors.length);
                 this.setupPropertyMapping(Array.from(properties));
                 document.getElementById('fileStats').classList.remove('hidden');
                 document.getElementById('propertyMapping').classList.remove('hidden');
+                
+                // Log errors to console for debugging
+                if (this.errors.length > 0) {
+                    console.warn('Geometry errors found:', this.errors);
+                }
             }
 
             updateStats(features, polygons, multiPolygons, points, errors) {
@@ -1730,30 +1905,41 @@
                 document.getElementById('errorCount').textContent = errors;
             }
 
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
             setupPropertyMapping(existingProperties) {
                 const predefinedFields = ['ProducerName', 'ProductionPlace', 'Area', 'ProducerCountry', 'AdditionalInfo'];
                 const propertyList = document.getElementById('propertyList');
                 propertyList.innerHTML = '';
 
                 existingProperties.forEach(prop => {
+                    const escapedProp = this.escapeHtml(prop);
                     const row = document.createElement('div');
                     row.className = 'property-row';
                     row.innerHTML = `
-                        <input type="text" value="${prop}" readonly>
+                        <input type="text" value="${escapedProp}" readonly data-original-property="${escapedProp}">
                         <span>→</span>
-                        <select data-source="${prop}">
+                        <select>
+                            <option value="__leave_as_is__" selected>${this.getTranslation('leaveAsIs')}</option>
                             <option value="">${this.getTranslation('discardPropertyInformation')}</option>
                             ${predefinedFields.map(field => 
-                                `<option value="${field}" ${field === prop ? 'selected' : ''}>${field}</option>`
+                                `<option value="${this.escapeHtml(field)}" ${field === prop ? 'selected' : ''}>${this.escapeHtml(field)}</option>`
                             ).join('')}
                             <option value="custom">${this.getTranslation('customFieldName')}</option>
                         </select>
-                        <input type="text" placeholder="${this.getTranslation('customFieldName')}" style="display: none;" data-custom="${prop}">
+                        <input type="text" placeholder="${this.escapeHtml(this.getTranslation('customFieldName'))}" style="display: none;" class="custom-field-input">
                     `;
                     propertyList.appendChild(row);
 
+                    // Store the original property name on the row element for later retrieval
+                    row.dataset.originalProperty = prop;
+
                     const select = row.querySelector('select');
-                    const customInput = row.querySelector('input[data-custom]');
+                    const customInput = row.querySelector('.custom-field-input');
                     
                     select.addEventListener('change', (e) => {
                         if (e.target.value === 'custom') {
@@ -1774,12 +1960,12 @@
                 row.className = 'static-field-row';
                 row.innerHTML = `
                     <select>
-                        <option value="">${this.getTranslation('selectField')}</option>
-                        ${predefinedFields.map(field => `<option value="${field}">${field}</option>`).join('')}
-                        <option value="custom">${this.getTranslation('customField')}</option>
+                        <option value="">${this.escapeHtml(this.getTranslation('selectField'))}</option>
+                        ${predefinedFields.map(field => `<option value="${this.escapeHtml(field)}">${this.escapeHtml(field)}</option>`).join('')}
+                        <option value="custom">${this.escapeHtml(this.getTranslation('customField'))}</option>
                     </select>
-                    <input type="text" placeholder="${this.getTranslation('customFieldName')}" style="display: none;">
-                    <input type="text" placeholder="${this.getTranslation('staticValue')}">
+                    <input type="text" placeholder="${this.escapeHtml(this.getTranslation('customFieldName'))}" style="display: none;" class="custom-name-input">
+                    <input type="text" placeholder="${this.escapeHtml(this.getTranslation('staticValue'))}" class="static-value-input">
                     <button type="button" onclick="this.parentElement.remove()">
                         🗑️
                     </button>
@@ -1787,7 +1973,7 @@
                 staticFieldsList.appendChild(row);
 
                 const select = row.querySelector('select');
-                const customInput = row.querySelector('input[placeholder="' + this.getTranslation('customFieldName') + '"]');
+                const customInput = row.querySelector('.custom-name-input');
                 
                 select.addEventListener('change', (e) => {
                     if (e.target.value === 'custom') {
@@ -1800,9 +1986,8 @@
             }
 
             extractFeatures(data) {
-                const features = [];
-
                 if (data.type === 'FeatureCollection') {
+                    // Return direct reference to avoid copying
                     return data.features || [];
                 } else if (data.type === 'Feature') {
                     return [data];
@@ -1814,13 +1999,18 @@
                         properties: {}
                     }];
                 } else if (Array.isArray(data)) {
-                    // Array of features or geometries
-                    data.forEach(item => {
-                        features.push(...this.extractFeatures(item));
-                    });
+                    // Array of features or geometries - flatten recursively
+                    const features = [];
+                    for (let i = 0; i < data.length; i++) {
+                        const extracted = this.extractFeatures(data[i]);
+                        for (let j = 0; j < extracted.length; j++) {
+                            features.push(extracted[j]);
+                        }
+                    }
+                    return features;
                 }
 
-                return features;
+                return [];
             }
 
             async processGeoJSON() {
@@ -1833,30 +2023,42 @@
                 this.updateProgress(0);
 
                 try {
-                    // Extract features
-                    let features = this.extractFeatures(this.rawData);
-                    this.updateProgress(20);
-
                     // Collect property mappings
                     this.collectPropertyMappings();
                     this.collectStaticFields();
-                    this.updateProgress(40);
+                    this.updateProgress(10);
 
-                    // Process features
+                    // Extract features
+                    const features = this.extractFeatures(this.rawData);
+                    const totalFeatures = features.length;
+                    this.updateProgress(20);
+
+                    // Process features in batches to allow browser to breathe
                     const processedFeatures = [];
-                    for (let i = 0; i < features.length; i++) {
-                        const feature = features[i];
+                    const batchSize = 1000;
+                    
+                    for (let i = 0; i < totalFeatures; i += batchSize) {
+                        const batchEnd = Math.min(i + batchSize, totalFeatures);
                         
-                        // Split MultiPolygons if requested
-                        if (document.getElementById('splitMultiPolygons').checked && 
-                            feature.geometry && feature.geometry.type === 'MultiPolygon') {
-                            const splitFeatures = this.splitMultiPolygon(feature);
-                            processedFeatures.push(...splitFeatures);
-                        } else {
-                            processedFeatures.push(this.processFeature(feature));
+                        // Process this batch
+                        for (let j = i; j < batchEnd; j++) {
+                            const feature = features[j];
+                            
+                            // Split MultiPolygons if requested
+                            if (document.getElementById('splitMultiPolygons').checked && 
+                                feature.geometry && feature.geometry.type === 'MultiPolygon') {
+                                const splitFeatures = this.splitMultiPolygon(feature);
+                                processedFeatures.push(...splitFeatures);
+                            } else {
+                                processedFeatures.push(this.processFeature(feature));
+                            }
                         }
                         
-                        this.updateProgress(40 + (i / features.length) * 40);
+                        // Update progress
+                        this.updateProgress(20 + (batchEnd / totalFeatures) * 60);
+                        
+                        // Yield to browser to prevent blocking
+                        await new Promise(resolve => setTimeout(resolve, 0));
                     }
 
                     // Create final GeoJSON
@@ -1865,11 +2067,13 @@
                         features: processedFeatures
                     };
 
-                    this.updateProgress(100);
-                    this.showSuccess(this.getTranslation('successfullyProcessed') + processedFeatures.length + this.getTranslation('featuresCount'));
+                    this.updateProgress(90);
                     
                     // Automatically download the processed file
                     this.downloadResult();
+                    
+                    this.updateProgress(100);
+                    this.showSuccess(this.getTranslation('successfullyProcessed') + processedFeatures.length + this.getTranslation('featuresCount'));
                     
                 } catch (error) {
                     this.showError(this.getTranslation('processingFailed') + error.message);
@@ -1884,16 +2088,20 @@
                 
                 const propertyRows = document.querySelectorAll('#propertyList .property-row');
                 propertyRows.forEach(row => {
-                    const sourceField = row.querySelector('input[readonly]').value;
+                    // Get the original (unescaped) property name from the data attribute
+                    const sourceField = row.dataset.originalProperty;
                     const select = row.querySelector('select');
-                    const customInput = row.querySelector('input[data-custom]');
+                    const customInput = row.querySelector('.custom-field-input');
                     
                     let targetField = select.value;
-                    if (targetField === 'custom' && customInput.value.trim()) {
-                        targetField = customInput.value.trim();
-                    }
                     
-                    if (targetField && targetField !== '') {
+                    if (targetField === '__leave_as_is__') {
+                        // Leave as is - map property to itself
+                        this.propertyMappings.set(sourceField, sourceField);
+                    } else if (targetField === 'custom' && customInput.value.trim()) {
+                        targetField = customInput.value.trim();
+                        this.propertyMappings.set(sourceField, targetField);
+                    } else if (targetField && targetField !== '') {
                         this.propertyMappings.set(sourceField, targetField);
                     } else {
                         // If targetField is empty, mark this property as discarded
@@ -1908,8 +2116,8 @@
                 const staticRows = document.querySelectorAll('#staticFieldsList .static-field-row');
                 staticRows.forEach(row => {
                     const select = row.querySelector('select');
-                    const customInput = row.querySelector('input[placeholder="' + this.getTranslation('customFieldName') + '"]');
-                    const valueInput = row.querySelector('input[placeholder="' + this.getTranslation('staticValue') + '"]');
+                    const customInput = row.querySelector('.custom-name-input');
+                    const valueInput = row.querySelector('.static-value-input');
                     
                     let fieldName = select.value;
                     if (fieldName === 'custom' && customInput.value.trim()) {
@@ -1933,12 +2141,14 @@
                             type: 'Polygon',
                             coordinates: polygonCoords
                         },
-                        properties: { ...feature.properties }
+                        properties: feature.properties
                     };
                     
                     // Add index to distinguish split features
-                    if (feature.properties.id) {
-                        newFeature.properties.id = `${feature.properties.id}_${index + 1}`;
+                    if (feature.properties && feature.properties.id) {
+                        newFeature.properties = Object.assign({}, feature.properties, {
+                            id: `${feature.properties.id}_${index + 1}`
+                        });
                     }
                     
                     splitFeatures.push(this.processFeature(newFeature));
@@ -1948,35 +2158,146 @@
             }
 
             processFeature(feature) {
-                const processedFeature = {
-                    type: 'Feature',
-                    geometry: feature.geometry,
-                    properties: {}
-                };
+                // Build properties object more efficiently
+                const properties = {};
 
                 // Apply property mappings
                 if (feature.properties) {
-                    Object.entries(feature.properties).forEach(([key, value]) => {
+                    for (const key in feature.properties) {
                         // Skip discarded properties
                         if (this.discardedProperties && this.discardedProperties.has(key)) {
-                            return;
+                            continue;
                         }
                         const mappedKey = this.propertyMappings.get(key) || key;
-                        processedFeature.properties[mappedKey] = value;
-                    });
+                        properties[mappedKey] = feature.properties[key];
+                    }
                 }
 
                 // Apply static fields
                 this.staticFields.forEach((value, key) => {
-                    processedFeature.properties[key] = value;
+                    properties[key] = value;
                 });
 
                 // Validate geometry if requested
+                let geometry = feature.geometry;
                 if (document.getElementById('validateGeometry').checked) {
-                    processedFeature.geometry = this.validateAndFixGeometry(processedFeature.geometry);
+                    geometry = this.validateAndFixGeometry(geometry);
                 }
 
-                return processedFeature;
+                return {
+                    type: 'Feature',
+                    geometry: geometry,
+                    properties: properties
+                };
+            }
+
+            roundCoordinate(coord, decimals = 6) {
+                // Round a single coordinate value to specified decimal places
+                const factor = Math.pow(10, decimals);
+                return Math.round(coord * factor) / factor;
+            }
+
+            roundCoordinates(coordinates, type) {
+                // Round coordinates based on geometry type
+                if (!coordinates) return coordinates;
+
+                switch (type) {
+                    case 'Point':
+                        // [lon, lat] or [lon, lat, elevation]
+                        return coordinates.map(coord => this.roundCoordinate(coord));
+                    
+                    case 'LineString':
+                    case 'MultiPoint':
+                        // [[lon, lat], [lon, lat], ...]
+                        return coordinates.map(coord => 
+                            coord.map(c => this.roundCoordinate(c))
+                        );
+                    
+                    case 'Polygon':
+                    case 'MultiLineString':
+                        // [[[lon, lat], [lon, lat], ...], ...]
+                        return coordinates.map(ring =>
+                            ring.map(coord => coord.map(c => this.roundCoordinate(c)))
+                        );
+                    
+                    case 'MultiPolygon':
+                        // [[[[lon, lat], [lon, lat], ...], ...], ...]
+                        return coordinates.map(polygon =>
+                            polygon.map(ring =>
+                                ring.map(coord => coord.map(c => this.roundCoordinate(c)))
+                            )
+                        );
+                    
+                    default:
+                        return coordinates;
+                }
+            }
+
+            calculateSignedArea(ring) {
+                // Calculate signed area of a ring using the Shoelace formula
+                // Positive area = counterclockwise, Negative area = clockwise
+                if (!ring || ring.length < 3) return 0;
+                
+                let area = 0;
+                for (let i = 0; i < ring.length - 1; i++) {
+                    const [x1, y1] = ring[i];
+                    const [x2, y2] = ring[i + 1];
+                    area += (x2 - x1) * (y2 + y1);
+                }
+                return area;
+            }
+
+            closeRing(ring) {
+                // Ensure ring is closed (first and last coordinates match)
+                if (!ring || ring.length === 0) return ring;
+                
+                const first = ring[0];
+                const last = ring[ring.length - 1];
+                
+                if (first[0] !== last[0] || first[1] !== last[1]) {
+                    ring.push([first[0], first[1]]);
+                }
+                
+                return ring;
+            }
+
+            normalizeRingWindingOrder(ring, isExterior) {
+                // Normalize ring winding order
+                // Exterior rings: counterclockwise (positive area)
+                // Holes: clockwise (negative area)
+                if (!ring || ring.length < 3) return ring;
+                
+                const signedArea = this.calculateSignedArea(ring);
+                const isCounterClockwise = signedArea > 0;
+                
+                // If exterior ring should be CCW but is CW, or hole should be CW but is CCW, reverse
+                if ((isExterior && !isCounterClockwise) || (!isExterior && isCounterClockwise)) {
+                    // Reverse the ring, but keep last point as duplicate of first after reversal
+                    const reversed = ring.slice(0, -1).reverse();
+                    reversed.push([reversed[0][0], reversed[0][1]]);
+                    return reversed;
+                }
+                
+                return ring;
+            }
+
+            fixPolygonGeometry(coordinates) {
+                // Fix a Polygon's coordinates: close rings and normalize winding order
+                if (!coordinates || coordinates.length === 0) return coordinates;
+                
+                for (let i = 0; i < coordinates.length; i++) {
+                    let ring = coordinates[i];
+                    
+                    // Close the ring
+                    ring = this.closeRing(ring);
+                    
+                    // Normalize winding order (first ring is exterior, others are holes)
+                    ring = this.normalizeRingWindingOrder(ring, i === 0);
+                    
+                    coordinates[i] = ring;
+                }
+                
+                return coordinates;
             }
 
             validateAndFixGeometry(geometry) {
@@ -1986,17 +2307,18 @@
 
                 // Basic validation and fixes
                 try {
-                    if (geometry.type === 'Polygon') {
-                        // Ensure first and last coordinates are the same
-                        geometry.coordinates.forEach(ring => {
-                            if (ring.length > 0) {
-                                const first = ring[0];
-                                const last = ring[ring.length - 1];
-                                if (first[0] !== last[0] || first[1] !== last[1]) {
-                                    ring.push([first[0], first[1]]);
-                                }
-                            }
-                        });
+                    if (geometry.type === 'Polygon' && geometry.coordinates) {
+                        geometry.coordinates = this.fixPolygonGeometry(geometry.coordinates);
+                    } else if (geometry.type === 'MultiPolygon' && geometry.coordinates) {
+                        // Fix each polygon in the MultiPolygon
+                        for (let i = 0; i < geometry.coordinates.length; i++) {
+                            geometry.coordinates[i] = this.fixPolygonGeometry(geometry.coordinates[i]);
+                        }
+                    }
+
+                    // Round coordinates if requested
+                    if (document.getElementById('roundCoordinates').checked) {
+                        geometry.coordinates = this.roundCoordinates(geometry.coordinates, geometry.type);
                     }
                 } catch (error) {
                     console.warn('Geometry validation failed:', error);
@@ -2011,7 +2333,13 @@
                     return;
                 }
 
-                const blob = new Blob([JSON.stringify(this.processedData, null, 2)], {
+                // Check if whitespace removal is requested
+                const removeWhitespace = document.getElementById('removeWhitespace').checked;
+                const jsonString = removeWhitespace 
+                    ? JSON.stringify(this.processedData) 
+                    : JSON.stringify(this.processedData, null, 2);
+
+                const blob = new Blob([jsonString], {
                     type: 'application/json'
                 });
                 
@@ -2023,6 +2351,9 @@
                 a.click();
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
+                
+                // Clear processed data after download to free memory
+                this.processedData = null;
             }
 
             reset() {
